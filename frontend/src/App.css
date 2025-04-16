@@ -3,73 +3,180 @@
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #f3f6fa;
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
 .chat-container {
-  width: 400px;
-  height: 600px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  width: 420px;
+  height: 620px;
+  border: none;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.03);
   display: flex;
   flex-direction: column;
-  background-color: white;
+  background: #fff;
+  overflow: hidden;
 }
 
 .messages {
   flex: 1;
-  padding: 16px;
+  padding: 20px 18px 16px 18px;
   overflow-y: auto;
+  background: #f8fafc;
 }
 
+.message-row {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+.message-row.user {
+  flex-direction: row-reverse;
+}
+.message-row.ai {
+  flex-direction: row;
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin: 0 8px;
+  background: #e9ecef;
+}
+.user-avatar {
+  background: linear-gradient(135deg, #007bff 60%, #5bc0eb 100%);
+  color: #fff;
+}
+.ai-avatar {
+  background: #e9ecef;
+  color: #007bff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.error-avatar {
+  background: #fff3cd;
+  color: #d39e00;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #ffeeba;
+}
 .message {
-  margin-bottom: 12px;
-  padding: 8px 12px;
+  position: relative;
+  padding: 10px 16px;
   border-radius: 18px;
   max-width: 70%;
+  font-size: 15px;
+  line-height: 1.6;
+  word-break: break-word;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
-
 .message.user {
-  align-self: flex-end;
-  background-color: #007bff;
-  color: white;
+  background: linear-gradient(135deg, #007bff 60%, #5bc0eb 100%);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: 18px;
 }
-
 .message.ai {
-  align-self: flex-start;
-  background-color: #e9ecef;
-  color: black;
+  background: #f1f3f6;
+  color: #222;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 18px;
 }
-
 .message.error {
   align-self: center;
   background-color: #dc3545;
   color: white;
+  font-weight: bold;
 }
-
 .input-area {
   display: flex;
-  padding: 12px;
-  border-top: 1px solid #ddd;
+  padding: 14px 16px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
 }
-
 .input-area input {
   flex: 1;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 20px;
-  margin-right: 8px;
+  padding: 10px 16px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 22px;
+  margin-right: 10px;
+  font-size: 15px;
+  outline: none;
+  background: #f8fafc;
+  transition: border 0.2s;
 }
-
-.input-area button {
-  padding: 8px 16px;
-  background-color: #007bff;
-  color: white;
+.input-area input:focus {
+  border-color: #007bff;
+  background: #fff;
+}
+.send-btn {
+  padding: 0 18px;
+  background: linear-gradient(135deg, #007bff 60%, #5bc0eb 100%);
+  color: #fff;
   border: none;
-  border-radius: 20px;
+  border-radius: 22px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.send-btn:hover {
+  background: linear-gradient(135deg, #0069d9 60%, #4fa3e3 100%);
+  box-shadow: 0 2px 8px rgba(0,123,255,0.08);
+}
+@media (max-width: 500px) {
+  .chat-container {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .messages {
+    padding: 12px 4px 10px 4px;
+  }
+  .input-area {
+    padding: 8px 4px;
+  }
 }
 
-.input-area button:hover {
-  background-color: #0069d9;
+.timestamp {
+  position: absolute;
+  right: 8px;
+  bottom: -18px;
+  font-size: 11px;
+  color: #8c98a4;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.message-row:hover .timestamp {
+  opacity: 1;
+}
+
+.message.user .timestamp {
+  color: #8c98a4;
+  right: auto;
+  left: 8px;
+}
+
+.message.ai .timestamp {
+  color: #64748b;
+}
+
+.message.error .timestamp {
+  color: #ef4444;
+  opacity: 0.9;
 }

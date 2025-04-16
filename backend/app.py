@@ -6,6 +6,12 @@ from dotenv import load_dotenv
 # 加载环境变量
 load_dotenv()
 
+# 统一配置环境变量默认值
+CONFIG = {
+    "BAILIAN_API_KEY": os.getenv("BAILIAN_API_KEY", "test-api-key"),
+    "BAILIAN_API_URL": os.getenv("BAILIAN_API_URL", "https://api.bailian.openai.example/v1/chat")
+}
+
 app = Flask(__name__)
 
 @app.route('/chat', methods=['POST'])
@@ -17,7 +23,7 @@ def chat_proxy():
         
         # 构造百炼平台请求
         headers = {
-            "Authorization": f"Bearer {os.getenv('BAILIAN_API_KEY')}",
+            "Authorization": f"Bearer {CONFIG['BAILIAN_API_KEY']}",
             "Content-Type": "application/json"
         }
         payload = {
@@ -30,7 +36,7 @@ def chat_proxy():
         
         # 调用百炼平台API
         response = requests.post(
-            os.getenv('BAILIAN_API_URL'),
+            CONFIG['BAILIAN_API_URL'],
             json=payload,
             headers=headers
         )

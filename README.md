@@ -13,6 +13,19 @@
 2. AI回复接收与显示
 3. 简单的错误处理
 
+## 配置说明
+1. 环境变量配置：
+   - 复制示例文件并重命名：
+     ```bash
+     cp backend/.env.example backend/.env
+     cp frontend/.env.example frontend/.env
+     ```
+   - 后端配置(`backend/.env`):
+     - BAILIAN_API_URL: 百炼平台API地址
+     - BAILIAN_API_KEY: 百炼平台API密钥
+   - 前端配置(`frontend/.env`):
+     - REACT_APP_API_BASE_URL: 后端服务地址(默认http://localhost:5000)
+
 ## 快速开始
 
 ### 前端启动
@@ -28,19 +41,6 @@ cd backend
 pip install -r requirements.txt
 python app.py
 ```
-
-## 配置说明
-1. 环境变量配置：
-   - 复制示例文件并重命名：
-     ```bash
-     cp backend/.env.example backend/.env
-     cp frontend/.env.example frontend/.env
-     ```
-   - 后端配置(`backend/.env`):
-     - BAILIAN_API_URL: 百炼平台API地址
-     - BAILIAN_API_KEY: 百炼平台API密钥
-   - 前端配置(`frontend/.env`):
-     - REACT_APP_API_BASE_URL: 后端服务地址(默认http://localhost:5000)
 
 ## 项目结构
 ```
