@@ -84,19 +84,21 @@ def chat_proxy():
 
         response_data = response.json()
         # 可以考虑记录部分响应数据，但避免记录过多内容
-        # logging.debug(f"收到百炼 API 响应内容: {response_data}")
+        logging.debug(f"收到百炼 API 响应内容: {response_data}")
 
         # 从响应中提取模型回复 (根据文档调整)
         ai_response = response_data.get("output", {}).get("text", "抱歉，未能获取到回复。")
         # 从响应中提取 session_id 用于下一轮对话
         next_session_id = response_data.get("output", {}).get("session_id")
         logging.info(f"提取到 AI 回复和 next_session_id: '{next_session_id}'")
-        logging.debug(f"AI 回复: '{ai_response}'")
+
+        usage_details = response_data.get("usage", {})
 
         # 返回AI回复和 session_id
         return jsonify({
             "response": ai_response,
-            "session_id": next_session_id # 将 session_id 返回给前端
+            "session_id": next_session_id, # 将 session_id 返回给前端
+            "usage": usage_details,
         })
 
     except requests.exceptions.RequestException as e:

@@ -28,7 +28,7 @@
 
 .message-row {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   margin-bottom: 16px;
 }
 .message-row.user {
@@ -70,14 +70,11 @@
   border: 1.5px solid #ffeeba;
 }
 .message {
-  position: relative;
-  padding: 10px 16px;
+  padding: 10px 15px;
   border-radius: 18px;
+  margin-bottom: 5px;
   max-width: 70%;
-  font-size: 15px;
-  line-height: 1.6;
-  word-break: break-word;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  position: relative;
 }
 .message.user {
   background: linear-gradient(135deg, #007bff 60%, #5bc0eb 100%);
@@ -86,10 +83,10 @@
   border-bottom-left-radius: 18px;
 }
 .message.ai {
-  background: #f1f3f6;
-  color: #222;
-  border-bottom-left-radius: 6px;
-  border-bottom-right-radius: 18px;
+  background-color: #e9e9eb;
+  color: #333;
+  align-self: flex-start;
+  margin-left: 10px;
 }
 .message.error {
   align-self: center;
@@ -136,6 +133,33 @@
   background: linear-gradient(135deg, #0069d9 60%, #4fa3e3 100%);
   box-shadow: 0 2px 8px rgba(0,123,255,0.08);
 }
+.send-btn svg {
+  color: white;
+}
+
+/* 新增：清空按钮样式 */
+.clear-btn {
+  background-color: #dc3545; /* 红色背景 */
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-left: 8px; /* 和发送按钮保持一点距离 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+}
+
+.clear-btn:hover {
+  background-color: #c82333; /* 悬停时深红色 */
+}
+
+.clear-btn svg {
+  color: white;
+}
+
 @media (max-width: 500px) {
   .chat-container {
     width: 100vw;
@@ -151,32 +175,160 @@
   }
 }
 
-.timestamp {
+.message-footer {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 0.75em;
+  color: #888;
+  min-height: 1em;
+  width: auto;
+  padding: 0 4px;
+}
+
+.session-info-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.session-toggle-icon {
+  font-size: 0.9em;
+  color: #aaa;
+  display: inline-block;
+  user-select: none;
+}
+
+.session-details-bubble {
   position: absolute;
-  right: 8px;
-  bottom: -18px;
-  font-size: 11px;
-  color: #8c98a4;
-  opacity: 0.8;
-  transition: opacity 0.2s;
+  top: 100%;
+  left: 0;
+  transform: translateY(5px);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85em;
   white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.message-row:hover .timestamp {
-  opacity: 1;
+.usage-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #ddd;
 }
 
-.message.user .timestamp {
-  color: #8c98a4;
-  right: auto;
-  left: 8px;
+.usage-info span:first-child {
+  font-weight: 500;
 }
 
-.message.ai .timestamp {
-  color: #64748b;
+/* 如果需要，可以为 SessionID 单独添加样式 */
+/*
+.session-id-info {
+}
+*/
+
+.timestamp {
+  display: inline-block;
 }
 
-.message.error .timestamp {
-  color: #ef4444;
-  opacity: 0.9;
+.message.ai .message-footer {
+  color: #777;
+}
+
+.message.ai .session-toggle-icon {
+  color: #999;
+}
+
+.message-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: calc(100% - 40px - 16px);
+}
+
+.message-content-wrapper .message.ai {
+  margin-left: 0;
+}
+
+.message-content-wrapper.user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 8px;
+  max-width: calc(100% - 40px - 16px);
+}
+
+.message-row.user .message.user {
+  background: linear-gradient(135deg, #007bff 60%, #5bc0eb 100%);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: 18px;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+.message-row.user .message-footer {
+  color: #888;
+  font-size: 0.75em;
+  margin-top: 4px;
+  margin-right: 0;
+  padding: 0 2px;
+  width: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.message-row.user .session-info-container {
+  display: none;
+}
+
+/* Styles for disabled input and buttons */
+.input-area input:disabled {
+  background-color: #e9ecef; /* Light gray background */
+  cursor: not-allowed;       /* "Not allowed" cursor */
+  opacity: 0.7;              /* Slightly transparent */
+}
+
+.input-area button:disabled {
+  background: #adb5bd;    /* Gray background */
+  cursor: not-allowed;      /* "Not allowed" cursor */
+  opacity: 0.6;             /* More transparent */
+  box-shadow: none;         /* Remove shadow */
+}
+
+/* Ensure disabled send button's SVG color is appropriate */
+.input-area button.send-btn:disabled svg {
+  color: #f8f9fa; /* Lighter color for the icon */
+}
+
+/* Ensure disabled clear button's SVG color is appropriate */
+.input-area button.clear-btn:disabled svg {
+  color: #f8f9fa; /* Lighter color for the icon */
+}
+
+/* Loading dots animation */
+.loading-dots span {
+  animation: blink 1.4s infinite both;
+  margin: 0 1px;
+}
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0% { opacity: 0.2; }
+  20% { opacity: 1; }
+  100% { opacity: 0.2; }
 }
