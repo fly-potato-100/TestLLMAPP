@@ -17,7 +17,9 @@ function App() {
     
     try {
       // 发送到后端代理
-      const response = await axios.post(`${CONFIG.API_BASE_URL}/chat`, {
+      const url = `${CONFIG.API_BASE_URL}/chat`;
+      console.log(url);
+      const response = await axios.post(url, {
         message: input
       });
       
