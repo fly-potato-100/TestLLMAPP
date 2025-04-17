@@ -1,11 +1,11 @@
 # AI聊天网页Demo项目
 
 ## 项目概述
-基于React和Flask实现的AI聊天网页Demo，前端提供简洁聊天界面，后端作为百炼平台API代理。
+基于React和FastAPI实现的AI聊天网页Demo，前端提供简洁聊天界面，后端作为百炼平台API代理。
 
 ## 技术栈
 - 前端：React + Vite + Axios
-- 后端：Flask + python-dotenv + requests
+- 后端：FastAPI + Uvicorn + Pydantic + python-dotenv + requests
 - 部署：开发模式运行
 
 ## 功能特性
@@ -24,7 +24,7 @@
      - BAILIAN_API_URL: 百炼平台API地址
      - BAILIAN_API_KEY: 百炼平台API密钥
    - 前端配置(`frontend/.env`):
-     - REACT_APP_API_BASE_URL: 后端服务地址(默认http://localhost:5000)
+     - REACT_APP_API_BASE_URL: 后端服务地址(默认http://localhost:8000)
 
 ## 快速开始
 
@@ -39,7 +39,7 @@ npm start
 ```bash
 cd backend
 pip install -r requirements.txt
-python app.py
+uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## 项目结构
@@ -48,9 +48,10 @@ project-root/
 ├── frontend/        # React前端
 │   ├── src/        # 源代码
 │   └── package.json # 依赖配置
-├── backend/         # Flask后端
+├── backend/         # FastAPI后端
 │   ├── app.py      # 主程序
 │   └── .env        # 环境配置
+│   └── requirements.txt # 依赖文件
 └── README.md       # 项目文档
 ```
 

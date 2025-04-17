@@ -1,139 +1,227 @@
-import logging # 新增
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import requests
+import logging
 import os
+import argparse
+import requests
+import json
+from fastapi import FastAPI, HTTPException  # 修改: 引入 FastAPI 和 HTTPException
+from fastapi.middleware.cors import CORSMiddleware # 新增: 引入 CORSMiddleware
+from pydantic import BaseModel             # 新增: 引入 Pydantic 用于数据验证
 from dotenv import load_dotenv
-import argparse # 新增
+from typing import Optional, Dict, List     # 新增: 引入 List
 
 # 加载环境变量
 load_dotenv()
 
-# 配置日志记录 (移到 main 块中)
-# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s') # 修改
+# --- Pydantic 模型定义 ---
+class ChatInput(BaseModel):
+    prompt: str
+
+class BailianPayloadInput(BaseModel):
+    prompt: str
+    session_id: Optional[str] = None
+
+class BailianPayload(BaseModel):
+    input: BailianPayloadInput
+    parameters: Dict = {}
+    debug: Dict = {}
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+class ChatOutput(BaseModel):
+    text: str
+    session_id: Optional[str] = None
+
+# 新增: 符合百炼 API 文档的单个模型使用情况
+class BailianModelUsage(BaseModel):
+    model_id: Optional[str] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+
+# 修改: BailianUsage 模型结构以符合文档
+class BailianUsage(BaseModel):
+    models: Optional[List[BailianModelUsage]] = None
+
+class BailianResponse(BaseModel):
+    output: ChatOutput
+    usage: Optional[BailianUsage] = None
+    request_id: Optional[str] = None # 假设 API 可能返回 request_id
+
+class ChatResponse(BaseModel):
+    response: str
+    session_id: Optional[str] = None
+    usage: Optional[BailianUsage] = None
+
+# --- 新增: Hello 端点 ---
+class HelloResponse(BaseModel):
+    message: str
+
+# --- 配置 ---
+# 配置日志记录 (稍后在 main 中根据参数设置级别)
 
 # 统一配置环境变量默认值
 CONFIG = {
-    "BAILIAN_API_KEY": os.getenv("BAILIAN_API_KEY", "YOUR_API_KEY"), # 只使用 BAILIAN_API_KEY
-    "BAILIAN_APP_ID": os.getenv("BAILIAN_APP_ID", "YOUR_APP_ID"), # 新增 App ID 配置
-    # 基础 API URL，需要拼接 app_id 和 /completion
+    "BAILIAN_API_KEY": os.getenv("BAILIAN_API_KEY", "YOUR_API_KEY"),
+    "BAILIAN_APP_ID": os.getenv("BAILIAN_APP_ID", "YOUR_APP_ID"),
     "BAILIAN_BASE_API_URL": os.getenv("BAILIAN_API_URL", "https://dashscope.aliyuncs.com/api/v1/apps")
 }
 
 # 检查必要的环境变量是否已设置
 if CONFIG["BAILIAN_API_KEY"] == "YOUR_API_KEY" or CONFIG["BAILIAN_APP_ID"] == "YOUR_APP_ID":
-    # 使用日志记录器打印警告
-    logging.warning("请在 .env 文件中设置 BAILIAN_API_KEY 和 BAILIAN_APP_ID") # 修改
+    logging.warning("请在 .env 文件中设置 BAILIAN_API_KEY 和 BAILIAN_APP_ID")
 
-app = Flask(__name__)
-CORS(app)
+# --- FastAPI 应用实例 ---
+app = FastAPI()
 
-@app.route('/chat', methods=['POST'])
-def chat_proxy():
+# 配置 CORS
+# 允许所有来源，所有方法，所有头，可以根据需要调整
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # 生产环境中应指定允许的源
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- 新增: Hello 端点 ---
+@app.get("/hello/{name}", response_model=HelloResponse)
+async def say_hello(name: str):
+    """接收路径参数 name 并返回问候消息。"""
+    logging.info(f"接收到 /hello/{name} 请求")
+    return {"message": f"Hello, {name}"}
+
+# --- API 端点 ---
+@app.post("/chat", response_model=ChatResponse) # 修改: 使用 FastAPI 装饰器和响应模型
+async def chat_proxy(chat_request: ChatRequest): # 修改: 使用 Pydantic 模型接收请求体，改为 async
     logging.info("===========chat_proxy===========")
     try:
-        # 获取前端消息
-        data = request.get_json()
-        user_message = data.get('message', '')
-        # 从前端获取 session_id (如果存在)
-        session_id = data.get('session_id', None)
+        user_message = chat_request.message
+        session_id = chat_request.session_id
 
         logging.info(f"接收到 /chat 请求: session_id='{session_id}'")
-        logging.debug(f"user_message='{user_message}'") 
+        logging.debug(f"user_message='{user_message}'")
 
         if not user_message:
-            logging.warning("请求缺少 'message' 字段") # 新增
-            return jsonify({"error": "Message is required"}), 400
+            # FastAPI 会自动处理 BaseModel 的验证，理论上不会到这里，但保留以防万一
+            logging.warning("请求缺少 'message' 字段 (理论上 Pydantic 已处理)")
+            raise HTTPException(status_code=400, detail="Message is required")
 
         # 构造百炼平台请求 URL
         api_url = f"{CONFIG['BAILIAN_BASE_API_URL']}/{CONFIG['BAILIAN_APP_ID']}/completion"
-        logging.debug(f"构造百炼 API URL: {api_url}") # 新增
+        logging.debug(f"构造百炼 API URL: {api_url}")
 
         # 构造请求头
         headers = {
             "Authorization": f"Bearer {CONFIG['BAILIAN_API_KEY']}",
             "Content-Type": "application/json"
         }
-        # 注意：出于安全考虑，不在日志中记录完整的 headers (包含 API Key)
 
-        # 构造请求体 (根据文档调整)
-        payload = {
-            "input": {
-                "prompt": user_message,
-            },
-            "parameters": {},
-            "debug": {}
-        }
-
-        # 如果前端传入了 session_id，则添加到 parameters 中
+        # 构造请求体 (使用 Pydantic 模型)
+        payload_input = BailianPayloadInput(prompt=user_message)
         if session_id:
-            payload["input"]["session_id"] = session_id
+            payload_input.session_id = session_id
+        payload = BailianPayload(input=payload_input)
 
-        logging.debug(f"构造百炼请求体: {payload}") # 新增
+        # 将 Pydantic 模型转为字典用于 requests
+        payload_dict = payload.model_dump(exclude_none=True) # exclude_none 确保可选字段不传 null
 
-        # 调用百炼平台API
-        logging.info("开始调用百炼 API") # 新增
+        logging.debug(f"构造百炼请求体: {payload_dict}")
+
+        # 调用百炼平台API (仍然使用同步 requests，未来可换成 httpx)
+        logging.info("开始调用百炼 API")
+        # 在异步函数中调用同步代码需要注意，对于 requests 这种 IO 密集操作通常还好
+        # 但更优的方式是使用异步 http 客户端如 httpx
         response = requests.post(
             api_url,
-            json=payload,
+            json=payload_dict, # 发送字典
             headers=headers,
-            stream=False # 通常聊天接口不需要流式输出，除非明确需要
+            stream=False
         )
-        logging.debug(f"收到百炼 API 响应状态码: {response.status_code}") # 新增
-        response.raise_for_status() # 如果请求失败 (非 2xx 状态码)，抛出异常
+        logging.debug(f"收到百炼 API 响应状态码: {response.status_code}")
+        response.raise_for_status() # 如果请求失败 (非 2xx 状态码)，requests 会抛出 HTTPError
 
         response_data = response.json()
-        # 可以考虑记录部分响应数据，但避免记录过多内容
-        logging.debug(f"收到百炼 API 响应内容: {response_data}")
+        logging.debug(
+            "收到百炼 API 响应内容: %s\n", 
+            json.dumps(response_data, indent=2, ensure_ascii=False)
+        )
 
-        # 从响应中提取模型回复 (根据文档调整)
-        ai_response = response_data.get("output", {}).get("text", "抱歉，未能获取到回复。")
-        # 从响应中提取 session_id 用于下一轮对话
-        next_session_id = response_data.get("output", {}).get("session_id")
+        # 使用 Pydantic 解析和验证响应
+        try:
+            bailian_response = BailianResponse.model_validate(response_data)
+        except Exception as pydantic_error: # 更具体的 Pydantic ValidationError
+            logging.error(f"解析百炼 API 响应失败: {pydantic_error}, 原始数据: {response_data}")
+            raise HTTPException(status_code=500, detail="解析 AI 服务响应时出错。")
+
+        # 从验证后的模型中提取数据
+        ai_response_text = bailian_response.output.text if bailian_response.output else "抱歉，未能获取到回复。"
+        next_session_id = bailian_response.output.session_id if bailian_response.output else None
+        usage_details = bailian_response.usage
+
         logging.info(f"提取到 AI 回复和 next_session_id: '{next_session_id}'")
 
-        usage_details = response_data.get("usage", {})
+        # 返回验证后的数据模型，FastAPI 自动序列化为 JSON
+        return ChatResponse(
+            response=ai_response_text,
+            session_id=next_session_id,
+            usage=usage_details
+        )
 
-        # 返回AI回复和 session_id
-        return jsonify({
-            "response": ai_response,
-            "session_id": next_session_id, # 将 session_id 返回给前端
-            "usage": usage_details,
-        })
+    except requests.exceptions.HTTPError as http_err:
+        # 处理 HTTP 错误 (由 raise_for_status 抛出)
+        status_code = http_err.response.status_code
+        error_detail = "未知 API 错误"
+        try:
+            error_detail = http_err.response.json() # 尝试获取 JSON 错误详情
+        except ValueError:
+            error_detail = http_err.response.text # 否则获取文本内容
+        error_message = f"API 请求失败 (状态码 {status_code}): {error_detail}"
+        logging.error(f"调用百炼 API 时发生 HTTP 错误: {error_message}")
+        raise HTTPException(status_code=status_code, detail="调用 AI 服务时出错。") # 转发错误
 
-    except requests.exceptions.RequestException as e:
-        # 更具体的网络或 HTTP 错误处理
-        error_message = f"API 请求失败: {e}"
-        status_code = 500
-        if e.response is not None:
-            status_code = e.response.status_code
-            try:
-                error_detail = e.response.json()
-                error_message = f"API 请求失败 (状态码 {status_code}): {error_detail}"
-            except ValueError: # 如果响应不是 JSON
-                 error_message = f"API 请求失败 (状态码 {status_code}): {e.response.text}"
+    except requests.exceptions.RequestException as req_err:
+        # 处理其他请求相关的错误 (如网络问题)
+        error_message = f"API 请求连接失败: {req_err}"
+        logging.error(error_message)
+        raise HTTPException(status_code=503, detail="无法连接到 AI 服务。") # Service Unavailable
 
-        logging.error(f"调用百炼 API 时发生请求错误: {error_message}") # 修改
-        # print(f"错误: {error_message}") # 在后端打印详细错误 (logging 替代)
-        return jsonify({"error": "调用 AI 服务时出错。"}), status_code # 返回给前端通用错误
-
+    except HTTPException as e:
+        # 重新抛出已知的 HTTPException
+        raise e
     except Exception as e:
-        logging.exception("处理 /chat 请求时发生未预料的错误") # 修改，使用 exception 记录堆栈信息
-        # print(f"内部服务器错误: {e}") # 在后端打印详细错误 (logging 替代)
-        return jsonify({"error": "服务器内部错误。"}), 500
+        logging.exception("处理 /chat 请求时发生未预料的错误")
+        raise HTTPException(status_code=500, detail="服务器内部错误。") # Internal Server Error
 
+# --- 主程序入口 ---
 if __name__ == '__main__':
+    import uvicorn # 修改: 引入 uvicorn
+
     # 设置命令行参数解析器
-    parser = argparse.ArgumentParser(description='启动 Flask 后端服务') # 新增
-    parser.add_argument('-v', '--verbose', action='store_true', help='启用 DEBUG 级别的日志记录') # 新增
-    args = parser.parse_args() # 新增
+    parser = argparse.ArgumentParser(description='启动 FastAPI 后端服务') # 修改描述
+    parser.add_argument('-v', '--verbose', action='store_true', help='启用 DEBUG 级别的日志记录')
+    parser.add_argument('--host', type=str, default=os.getenv("FASTAPI_HOST", "0.0.0.0"), help='服务监听的主机地址') # 新增 host 参数
+    parser.add_argument('--port', type=int, default=int(os.getenv("FASTAPI_PORT", 8000)), help='服务监听的端口') # 修改默认端口为 8000
+    parser.add_argument('--reload', action='store_true', help='启用热重载模式 (用于开发)') # 新增 reload 参数
+    args = parser.parse_args()
 
     # 根据参数配置日志级别
-    log_level = logging.DEBUG if args.verbose else logging.INFO # 新增
-    logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s') # 新增
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    # 配置 Uvicorn 的日志，FastAPI 会使用它
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["default"]["fmt"] = "%(asctime)s - %(levelname)s - %(message)s"
+    log_config["handlers"]["default"]["formatter"] = "default" # 应用格式化器
+    # 手动配置根日志记录器以捕获我们自己的日志
+    logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    # 建议从环境变量获取端口和调试模式
-    port = int(os.getenv("FLASK_RUN_PORT", 5000))
-    debug_mode = os.getenv("FLASK_DEBUG", "True").lower() == "true"
-    logging.info(f"启动 Flask 服务器，监听地址 0.0.0.0:{port}, Debug 模式: {debug_mode}") # 新增
-    app.run(host='0.0.0.0', port=port, debug=debug_mode) # 监听所有接口，方便容器化部署
+    logging.info(f"启动 FastAPI 服务器，监听地址 {args.host}:{args.port}, Debug 日志: {args.verbose}, 热重载: {args.reload}")
+
+    # 使用 uvicorn 启动应用
+    uvicorn.run(
+        "app:app",              # 指向 FastAPI 应用实例 (文件名:变量名)
+        host=args.host,
+        port=args.port,
+        reload=args.reload,     # 控制是否启用热重载
+        log_level='debug' if log_level == logging.DEBUG else 'info' # 修改: 传递字符串形式的日志级别
+        # log_config=log_config # 可以传递自定义的日志配置，但通常设置 log_level 就够了
+    )
