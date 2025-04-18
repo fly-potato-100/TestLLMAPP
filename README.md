@@ -23,6 +23,7 @@
    - 后端配置(`backend/.env`):
      - BAILIAN_API_URL: 百炼平台API地址
      - BAILIAN_API_KEY: 百炼平台API密钥
+     - 其他平台（如coze等）参考`backend/.env.example`
    - 前端配置(`frontend/.env`):
      - REACT_APP_API_BASE_URL: 后端服务地址(默认http://localhost:8000)
 
@@ -40,6 +41,9 @@ npm start
 cd backend
 pip install -r requirements.txt
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
+# 或者将整个backend目录当作一个python模块运行
+cd project-root/
+python -m backend.app -v
 ```
 
 ## 项目结构
@@ -49,8 +53,22 @@ project-root/
 │   ├── src/        # 源代码
 │   └── package.json # 依赖配置
 ├── backend/         # FastAPI后端
-│   ├── app.py      # 主程序
-│   └── .env        # 环境配置
+│   ├── app.py      # 主应用 (FastAPI实例, 中间件, 路由包含, 启动)
+│   ├── config.py   # 配置加载
+│   ├── models/     # Pydantic模型
+│   │   ├── __init__.py
+│   │   ├── bailian.py
+│   │   ├── chat.py
+│   │   └── common.py
+│   ├── routers/    # API路由
+│   │   ├── __init__.py
+│   │   ├── chat.py
+│   │   └── hello.py
+│   ├── services/   # 外部服务调用逻辑
+│   │   ├── __init__.py
+│   │   ├── bailian.py
+│   │   └── coze.py   # Coze API 占位符
+│   ├── .env        # 环境配置
 │   └── requirements.txt # 依赖文件
 └── README.md       # 项目文档
 ```

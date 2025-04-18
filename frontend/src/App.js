@@ -4,11 +4,11 @@ import './App.css';
 import CONFIG from "./config";
 
 // 新增：会话信息控件组件
-function SessionInfo({ sessionId, usage }) {
+function SessionInfo({ sessionId, usages }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // 如果既没有 sessionId 也没有 usage.models，则不渲染
-  if (!sessionId && (!usage || !usage.models || usage.models.length === 0)) {
+  if (!sessionId && (!usages || !usages.models || usages.models.length === 0)) {
     return null;
   }
 
@@ -21,7 +21,7 @@ function SessionInfo({ sessionId, usage }) {
         <div className="session-details-bubble">
           {sessionId && <div className="session-id-info">SessionID: {sessionId}</div>}
 
-          {usage?.models?.map((model, index) => {
+          {usages?.models?.map((model, index) => {
             const inputTokens = model.input_tokens ?? 0; // 使用 ?? 提供默认值 0
             const outputTokens = model.output_tokens ?? 0;
             const totalTokens = inputTokens + outputTokens;
@@ -128,16 +128,12 @@ function App() {
       const url = `${CONFIG.API_BASE_URL}/chat`;
       // 修改 requestData 结构
       const requestData = {
-        input: {
-          conversation: historyMessages, // 使用格式化后的历史消息和当前输入
-          session_id: currentSessionId, // 发送当前 sessionId
-          biz_params: {
-            channel_name: channelName,
-            platform_name: platformName,
-          }
-        },
-        // parameters: {}, // 如果需要可以添加参数
-        // debug: {}      // 如果需要可以添加调试信息
+        conversation: historyMessages, // 使用格式化后的历史消息和当前输入
+        session_id: currentSessionId, // 发送当前 sessionId
+        context_params: {
+          channel_name: channelName,
+          platform_name: platformName,
+        }
       };
       console.log('Sending request to:', url);
       console.log('Request data:', requestData);
@@ -156,7 +152,7 @@ function App() {
         sender: 'ai',
         time: new Date().toLocaleTimeString(),
         sessionId: response.data.session_id,
-        usage: response.data.usage
+        usages: response.data.usages
       };
       
       setMessages(prev => [...prev, aiMessage]);
@@ -202,7 +198,7 @@ function App() {
                       groupName={`candidate-${index}`}
                     />
                     <div className="message-footer">
-                      <SessionInfo sessionId={msg.sessionId} usage={msg.usage} />
+                      <SessionInfo sessionId={msg.sessionId} usages={msg.usages} />
                       <div className="timestamp">{msg.time}</div>
                     </div>
                   </div>
