@@ -1,7 +1,7 @@
 # AI聊天网页Demo项目
 
 ## 项目概述
-基于React和FastAPI实现的AI聊天网页Demo，前端提供简洁聊天界面，后端作为百炼平台API代理。
+基于React和FastAPI实现的AI聊天网页Demo，前端提供简洁聊天界面，后端作为百炼、coze、dify等平台API代理。
 
 ## 技术栈
 - 前端：React + Vite + Axios

@@ -13,22 +13,30 @@ from typing import Optional, Dict, List     # 新增: 引入 List
 load_dotenv()
 
 # --- Pydantic 模型定义 ---
-class ChatInput(BaseModel):
-    prompt: str
+# 新增: 单个消息模型
+class BailianPayloadInputMessage(BaseModel):
+    role: str
+    content: str
 
+# 修改: Bailian API 请求体中的 input 结构
 class BailianPayloadInput(BaseModel):
-    prompt: str
+    messages: Optional[List[BailianPayloadInputMessage]] = None
+    prompt: Optional[str] = None
     session_id: Optional[str] = None
+    biz_params: Dict = {}
 
 class BailianPayload(BaseModel):
     input: BailianPayloadInput
     parameters: Dict = {}
     debug: Dict = {}
 
-class ChatRequest(BaseModel):
-    message: str
+# 修改: 前端请求体结构
+class ChatInputData(BaseModel):
+    conversation: List[BailianPayloadInputMessage]
     session_id: Optional[str] = None
-
+    biz_params: Optional[Dict] = None
+class ChatRequest(BaseModel):
+    input: ChatInputData 
 class ChatOutput(BaseModel):
     text: str
     session_id: Optional[str] = None
@@ -49,7 +57,7 @@ class BailianResponse(BaseModel):
     request_id: Optional[str] = None # 假设 API 可能返回 request_id
 
 class ChatResponse(BaseModel):
-    response: str
+    response_text: str
     session_id: Optional[str] = None
     usage: Optional[BailianUsage] = None
 
@@ -96,16 +104,17 @@ async def say_hello(name: str):
 async def chat_proxy(chat_request: ChatRequest): # 修改: 使用 Pydantic 模型接收请求体，改为 async
     logging.info("===========chat_proxy===========")
     try:
-        user_message = chat_request.message
-        session_id = chat_request.session_id
+        # 修改: 从 chat_request.input 中提取数据
+        messages_history = chat_request.input.conversation
+        session_id = chat_request.input.session_id
+        biz_params_from_request = chat_request.input.biz_params # 新增: 提取 biz_params
 
-        logging.info(f"接收到 /chat 请求: session_id='{session_id}'")
-        logging.debug(f"user_message='{user_message}'")
+        logging.info(f"接收到 /chat 请求: session_id='{session_id}', messages_count={len(messages_history)}, biz_params={biz_params_from_request}") # 修改: 添加 biz_params 日志
+        logging.debug(f"Messages history: {messages_history}")
 
-        if not user_message:
-            # FastAPI 会自动处理 BaseModel 的验证，理论上不会到这里，但保留以防万一
-            logging.warning("请求缺少 'message' 字段 (理论上 Pydantic 已处理)")
-            raise HTTPException(status_code=400, detail="Message is required")
+        if not messages_history:
+            logging.warning("请求 input 中缺少 'messages' 字段或为空")
+            raise HTTPException(status_code=400, detail="Messages are required in input")
 
         # 构造百炼平台请求 URL
         api_url = f"{CONFIG['BAILIAN_BASE_API_URL']}/{CONFIG['BAILIAN_APP_ID']}/completion"
@@ -118,15 +127,23 @@ async def chat_proxy(chat_request: ChatRequest): # 修改: 使用 Pydantic 模�
         }
 
         # 构造请求体 (使用 Pydantic 模型)
-        payload_input = BailianPayloadInput(prompt=user_message)
-        if session_id:
+        payload_input = BailianPayloadInput()
+        if True:
+            payload_input.prompt = json.dumps([msg.model_dump() for msg in messages_history], ensure_ascii=False) # 添加 ensure_ascii=False 以正确处理中文
+        else:
+            payload_input.messages = messages_history
+        if session_id and False:
             payload_input.session_id = session_id
+        if biz_params_from_request:
+            payload_input.biz_params = biz_params_from_request
+        else:
+            raise HTTPException(status_code=400, detail="biz_params is required")
         payload = BailianPayload(input=payload_input)
 
         # 将 Pydantic 模型转为字典用于 requests
         payload_dict = payload.model_dump(exclude_none=True) # exclude_none 确保可选字段不传 null
 
-        logging.debug(f"构造百炼请求体: {payload_dict}")
+        logging.debug(f"构造百炼请求体: {json.dumps(payload_dict, indent=2, ensure_ascii=False)}")
 
         # 调用百炼平台API (仍然使用同步 requests，未来可换成 httpx)
         logging.info("开始调用百炼 API")
@@ -163,7 +180,7 @@ async def chat_proxy(chat_request: ChatRequest): # 修改: 使用 Pydantic 模�
 
         # 返回验证后的数据模型，FastAPI 自动序列化为 JSON
         return ChatResponse(
-            response=ai_response_text,
+            response_text=ai_response_text,
             session_id=next_session_id,
             usage=usage_details
         )
@@ -207,10 +224,7 @@ if __name__ == '__main__':
 
     # 根据参数配置日志级别
     log_level = logging.DEBUG if args.verbose else logging.INFO
-    # 配置 Uvicorn 的日志，FastAPI 会使用它
-    log_config = uvicorn.config.LOGGING_CONFIG
-    log_config["formatters"]["default"]["fmt"] = "%(asctime)s - %(levelname)s - %(message)s"
-    log_config["handlers"]["default"]["formatter"] = "default" # 应用格式化器
+
     # 手动配置根日志记录器以捕获我们自己的日志
     logging.basicConfig(level=log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -223,5 +237,4 @@ if __name__ == '__main__':
         port=args.port,
         reload=args.reload,     # 控制是否启用热重载
         log_level='debug' if log_level == logging.DEBUG else 'info' # 修改: 传递字符串形式的日志级别
-        # log_config=log_config # 可以传递自定义的日志配置，但通常设置 log_level 就够了
     )

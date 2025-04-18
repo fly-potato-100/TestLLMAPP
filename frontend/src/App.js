@@ -37,11 +37,46 @@ function SessionInfo({ sessionId, usage }) {
   );
 }
 
+// 新增：候选答案组件展示
+function CandidateAnswers({ answers, selectedIndex, onSelect, groupName }) {
+  if (!answers || answers.length === 0) return null;
+  return (
+    <div className="candidate-answers">
+      <div className="candidate-title">候选答案：</div>
+      <ul>
+        {answers.map((item, index) => (
+          <li key={index}>
+            <label className="candidate-item">
+              <input
+                type="radio"
+                name={groupName}
+                checked={index === selectedIndex}
+                onChange={() => onSelect(index)}
+              />
+              <span className="candidate-score" style={{ color: 'gray' }}>
+                [{((item.score || 0) * 100).toFixed(1)}%]
+              </span>
+              <span className="candidate-label" style={{ fontWeight: 'bold' }}>
+                答案{index + 1}：
+              </span>
+              <span className="candidate-text">
+                {item.content}
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [channelName, setChannelName] = useState('官方');
+  const [platformName, setPlatformName] = useState('android');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -51,6 +86,22 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // 处理切换候选答案
+  const handleSelectCandidate = (msgIndex, newIndex) => {
+    setMessages(prev =>
+      prev.map((m, i) => {
+        if (i === msgIndex && m.sender === 'ai') {
+          return {
+            ...m,
+            selectedIndex: newIndex,
+            text: m.candidateAnswers[newIndex]?.content || m.text,
+          };
+        }
+        return m;
+      })
+    );
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -62,11 +113,31 @@ function App() {
     setIsLoading(true);
 
     try {
+      // 准备符合 API 格式的消息历史
+      const historyMessages = messages
+        .filter(msg => msg.sender !== 'error') // 过滤掉错误消息
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }));
+
+      // 添加当前用户输入的消息
+      historyMessages.push({ role: 'user', content: currentInput });
+
       // 发送到后端代理
       const url = `${CONFIG.API_BASE_URL}/chat`;
+      // 修改 requestData 结构
       const requestData = {
-        message: currentInput, // 使用保存的输入值
-        session_id: currentSessionId // 发送当前 sessionId
+        input: {
+          conversation: historyMessages, // 使用格式化后的历史消息和当前输入
+          session_id: currentSessionId, // 发送当前 sessionId
+          biz_params: {
+            channel_name: channelName,
+            platform_name: platformName,
+          }
+        },
+        // parameters: {}, // 如果需要可以添加参数
+        // debug: {}      // 如果需要可以添加调试信息
       };
       console.log('Sending request to:', url);
       console.log('Request data:', requestData);
@@ -74,13 +145,18 @@ function App() {
       const response = await axios.post(url, requestData);
       console.log('Received response:', response.data);
 
-      // 添加AI回复，包含 sessionId
-      const aiMessage = { 
-        text: response.data.response, 
-        sender: 'ai', 
+      // 添加AI回复，包含 sessionId 和候选答案处理
+      const rawCandidates = response.data.response_text;
+      const candidates = typeof rawCandidates === 'string' ? JSON.parse(rawCandidates) : rawCandidates;
+      const firstAnswer = Array.isArray(candidates) && candidates.length > 0 ? candidates[0].content : '未找到答案';
+      const aiMessage = {
+        text: firstAnswer,
+        candidateAnswers: candidates,
+        selectedIndex: 0,
+        sender: 'ai',
         time: new Date().toLocaleTimeString(),
-        sessionId: response.data.session_id, // 存储从后端获取的 sessionId
-        usage: response.data.usage // 存储从后端获取的 usage 数据
+        sessionId: response.data.session_id,
+        usage: response.data.usage
       };
       
       setMessages(prev => [...prev, aiMessage]);
@@ -119,6 +195,12 @@ function App() {
                   <div className="avatar ai-avatar">🤖</div>
                   <div className="message-content-wrapper">
                     <div className={`message ${msg.sender}`}>{msg.text}</div>
+                    <CandidateAnswers
+                      answers={msg.candidateAnswers}
+                      selectedIndex={msg.selectedIndex}
+                      onSelect={newIdx => handleSelectCandidate(index, newIdx)}
+                      groupName={`candidate-${index}`}
+                    />
                     <div className="message-footer">
                       <SessionInfo sessionId={msg.sessionId} usage={msg.usage} />
                       <div className="timestamp">{msg.time}</div>
@@ -158,6 +240,26 @@ function App() {
             </div>
           )}
           <div ref={messagesEndRef} />
+        </div>
+        <div className="biz-params-selectors">
+          <label>
+            渠道:
+            <select value={channelName} onChange={(e) => setChannelName(e.target.value)} disabled={isLoading}>
+              <option value="小米">小米</option>
+              <option value="华为">华为</option>
+              <option value="苹果">苹果</option>
+              <option value="官方">官方</option>
+            </select>
+          </label>
+          <label>
+            平台:
+            <select value={platformName} onChange={(e) => setPlatformName(e.target.value)} disabled={isLoading}>
+              <option value="android">Android</option>
+              <option value="ios">iOS</option>
+              <option value="web">Web</option>
+              <option value="pc">PC</option>
+            </select>
+          </label>
         </div>
         <div className="input-area">
           <input

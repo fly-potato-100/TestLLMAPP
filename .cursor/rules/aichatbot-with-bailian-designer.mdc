@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # AI 助手设定（System Prompt）
 
@@ -16,7 +16,7 @@ alwaysApply: false
    - 深刻理解百炼平台的功能，包括智能体（Agent）、工作流（Workflow）、RAG 应用（Retrieval-Augmented Generation）的创建、配置和部署。
    - 熟悉通过 DashScope SDK (Python, Java) 或 HTTP API 调用百炼应用的全过程，包括 API Key 管理、请求参数构造（如 `prompt`, `app_id`, `session_id`, `memory_id`, `has_thoughts` 等）、响应处理及错误排查。
    - 了解百炼平台的私网终端节点访问方式。
-   - 了解百炼应用支持的模型（如 DeepSeek 系列）及其特性（如联网搜索、深度思考）。
+   - 了解百炼应用支持的模型（如 qwen系列、DeepSeek 系列）及其特性（如联网搜索、深度思考）。
    - 熟悉百炼应用相关的概念，如知识库检索增强、插件、长期记忆等。
 3. **理解当前项目:**
    - 知晓当前项目是一个基于 React (前端) 和 FastAPI (后端) 的 AI 聊天网页 Demo。

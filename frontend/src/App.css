@@ -8,8 +8,10 @@
 }
 
 .chat-container {
-  width: 420px;
-  height: 620px;
+  width: 66vw;
+  max-width: 90vw;
+  height: 66vh;
+  max-height: 90vh;
   border: none;
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 4px rgba(0,0,0,0.03);
@@ -96,7 +98,7 @@
 }
 .input-area {
   display: flex;
-  padding: 14px 16px;
+  padding: 10px 15px 15px 15px;
   border-top: 1px solid #f0f0f0;
   background: #fff;
 }
@@ -318,11 +320,12 @@
 /* Loading dots animation */
 .loading-dots span {
   animation: blink 1.4s infinite both;
-  margin: 0 1px;
 }
+
 .loading-dots span:nth-child(2) {
   animation-delay: 0.2s;
 }
+
 .loading-dots span:nth-child(3) {
   animation-delay: 0.4s;
 }
@@ -331,4 +334,79 @@
   0% { opacity: 0.2; }
   20% { opacity: 1; }
   100% { opacity: 0.2; }
+}
+
+/* 新增：下拉选择框样式 */
+.biz-params-selectors {
+  display: flex;
+  gap: 15px; /* 下拉框之间的间距 */
+  padding: 10px 15px 5px 15px; /* 内边距 (上 右 下 左) */
+  border-top: 1px solid #e0e0e0;
+  background-color: #f9f9f9; /* 背景色 */
+}
+
+.biz-params-selectors label {
+  display: flex;
+  align-items: center;
+  gap: 5px; /* 标签文字和下拉框的间距 */
+  font-size: 0.9em;
+  color: #555;
+}
+
+.biz-params-selectors select {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  font-size: 0.9em;
+  cursor: pointer;
+  min-width: 100px; /* 保证一定宽度 */
+}
+
+.biz-params-selectors select:disabled {
+  background-color: #eee;
+  cursor: not-allowed;
+}
+
+/* 候选答案样式 */
+.candidate-answers {
+  margin: 8px 0;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+.candidate-title {
+  font-size: 0.9em;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #333;
+}
+.candidate-answers ul {
+  list-style: decimal inside;
+  padding: 0;
+  margin: 0;
+}
+.candidate-answers li {
+  padding: 4px 0;
+  color: #555;
+  font-size: 0.85em;
+}
+
+/* 候选答案单选框样式 */
+.candidate-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.candidate-item input[type="radio"] {
+  cursor: pointer;
+  accent-color: #007bff;
+}
+
+/* 添加：候选答案标签宽度 */
+.candidate-label {
+  display: inline-block;
+  min-width: 4em;
 }
