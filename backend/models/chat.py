@@ -9,6 +9,7 @@ class ChatInputMessage(BaseModel):
 class ChatRequest(BaseModel):
     conversation: List[ChatInputMessage]
     session_id: Optional[str] = None
+    service: Optional[str] = None
     context_params: Optional[Dict] = None
 
 # 后端返回给前端的结构

@@ -2,9 +2,10 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 # 导入前端请求/响应模型和特定服务的调用函数
+import backend.config as config
 from backend.models.chat import ChatRequest, ChatResponse
 from backend.services.bailian import call_bailian_api
-# from backend.services.coze import call_coze_api # 预留 Coze 服务导入
+from backend.services.coze import call_coze_api # 导入 Coze 服务调用函数
 
 router = APIRouter()
 
@@ -13,24 +14,35 @@ async def chat_proxy(chat_request: ChatRequest):
     """处理聊天请求，将请求路由到相应的后端服务。"""
     logging.info("=========== /chat endpoint received request ==========")
     try:
-        # --- 选择调用哪个后端服务 ---
-        # 目前固定调用百炼，将来可以根据 chat_request 中的参数或其他逻辑选择
-        service_to_call = "bailian" # 或者 "coze"
+        # --- 从 chat_request 直接获取要调用的服务，默认为 bailian ---
+        service_to_call = "bailian" # 默认值
+        if chat_request.service:
+            service_to_call = chat_request.service.lower()
+            logging.info(f"Service specified in request body: '{service_to_call}'")
+        else:
+            logging.info("No service specified in request body, defaulting to 'bailian'")
 
+        # --- 根据服务名称调用相应的 API --- (移除原有的 context_params 检查)
         if service_to_call == "bailian":
-            # 直接将整个请求传递给服务层处理
+            logging.info("Routing request to Bailian service.")
+            if not config.check_bailian_vars():
+                raise HTTPException(status_code=500, detail="Bailian service configuration is missing.")
             return await call_bailian_api(chat_request)
 
         elif service_to_call == "coze":
-             # coze_response = await call_coze_api(chat_request) # 假设 Coze 服务也接收 ChatRequest
-             logging.warning("Coze service call is not implemented yet.")
-             raise HTTPException(status_code=501, detail="Coze service not implemented")
+            logging.info("Routing request to Coze service.")
+            if not config.check_coze_vars():
+                raise HTTPException(status_code=500, detail="Coze service configuration is missing.")
+            return await call_coze_api(chat_request) # 调用 Coze 服务
+
         else:
+             # 如果服务名称无效
              logging.error(f"Unknown service requested: {service_to_call}")
-             raise HTTPException(status_code=400, detail="Invalid service requested")
+             raise HTTPException(status_code=400, detail=f"Invalid service requested: {service_to_call}")
 
     except HTTPException as e:
         # 直接重新抛出由服务层或本层抛出的 HTTPException
+        # 服务层会处理它们自己的配置、连接、解析等错误
         raise e
     except Exception as e:
         # 捕获未预料的错误

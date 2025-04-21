@@ -77,6 +77,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [channelName, setChannelName] = useState('官方');
   const [platformName, setPlatformName] = useState('android');
+  const [serviceName, setServiceName] = useState('bailian');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -126,13 +127,15 @@ function App() {
 
       // 发送到后端代理
       const url = `${CONFIG.API_BASE_URL}/chat`;
-      // 修改 requestData 结构
+      // 修改 requestData 结构，添加 service_name
       const requestData = {
         conversation: historyMessages, // 使用格式化后的历史消息和当前输入
         session_id: currentSessionId, // 发送当前 sessionId
+        service: serviceName, // 将 service 移到顶层
         context_params: {
           channel_name: channelName,
           platform_name: platformName,
+          // service: serviceName, // 从这里移除
         }
       };
       console.log('Sending request to:', url);
@@ -141,23 +144,42 @@ function App() {
       const response = await axios.post(url, requestData);
       console.log('Received response:', response.data);
 
-      // 添加AI回复，包含 sessionId 和候选答案处理
-      const rawCandidates = response.data.response_text;
-      const candidates = typeof rawCandidates === 'string' ? JSON.parse(rawCandidates) : rawCandidates;
-      const firstAnswer = Array.isArray(candidates) && candidates.length > 0 ? candidates[0].content : '未找到答案';
+      // --- 处理 AI 回复 (统一按 JSON 候选答案格式处理) --- 
+      let aiResponseText = '抱歉，未能获取到回复。';
+      let candidates = [];
+      let selectedIndex = 0;
+
+      const rawResponse = response.data.response_text;
+
+      try {
+        // 始终尝试将 response_text 解析为 JSON 数组 (候选答案列表)
+        candidates = JSON.parse(rawResponse);
+        // 如果解析成功且是包含内容的数组，取第一个作为默认回复
+        aiResponseText = candidates[0].content; // 添加空检查
+        selectedIndex = 0;
+
+      } catch (e) {
+        // 如果 JSON 解析失败，说明返回的不是预期的 JSON 格式，直接将原始文本作为回复
+        console.warn("Failed to parse response_text as JSON, using raw text:", e);
+        aiResponseText = rawResponse;
+        candidates = [];
+        selectedIndex = 0;
+      }
+
       const aiMessage = {
-        text: firstAnswer,
-        candidateAnswers: candidates,
-        selectedIndex: 0,
+        text: aiResponseText,
+        candidateAnswers: candidates, // 传递解析后的候选答案列表
+        selectedIndex: selectedIndex,
         sender: 'ai',
         time: new Date().toLocaleTimeString(),
         sessionId: response.data.session_id,
         usages: response.data.usages
       };
-      
+      // --- 处理结束 ---
+
       setMessages(prev => [...prev, aiMessage]);
       // 更新当前 session_id 以备下次请求使用
-      setCurrentSessionId(response.data.session_id); 
+      setCurrentSessionId(response.data.session_id);
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -266,9 +288,15 @@ function App() {
             placeholder="输入消息..."
             disabled={isLoading}
           />
-          <button className="send-btn" onClick={handleSend} aria-label="发送" disabled={isLoading}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="currentColor"/></svg>
-          </button>
+          <div className="send-service-group">
+            <button className="send-btn" onClick={handleSend} aria-label="发送" disabled={isLoading}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 21L23 12L2 3V10L17 12L2 14V21Z" fill="currentColor"/></svg>
+            </button>
+            <select className="service-select" value={serviceName} onChange={(e) => setServiceName(e.target.value)} disabled={isLoading}>
+              <option value="bailian">Bailian</option>
+              <option value="coze">Coze</option>
+            </select>
+          </div>
           <button className="clear-btn" onClick={handleClear} aria-label="清空" disabled={isLoading}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M6 5C5.44772 5 5 5.44772 5 6V7H4C3.44772 7 3 7.44772 3 8C3 8.55228 3.44772 9 4 9H5V18C5 19.6569 6.34315 21 8 21H16C17.6569 21 19 19.6569 19 18V9H20C20.5523 9 21 8.55228 21 8C21 7.44772 20.5523 7 20 7H19V6C19 5.44772 18.5523 5 18 5C17.4477 5 17 5.44772 17 6V7H7V6C7 5.44772 6.55228 5 6 5ZM8 9H16V18C16 18.5523 15.5523 19 15 19H9C8.44772 19 8 18.5523 8 18V9ZM11 11C10.4477 11 10 11.4477 10 12V16C10 16.5523 10.4477 17 11 17C11.5523 17 12 16.5523 12 16V12C12 11.4477 11.5523 11 11 11ZM14 11C13.4477 11 13 11.4477 13 12V16C13 16.5523 13.4477 17 14 17C14.5523 17 15 16.5523 15 16V12C15 11.4477 14.5523 11 14 11Z" fill="currentColor"/></svg>
           </button>

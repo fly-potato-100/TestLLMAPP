@@ -98,68 +98,133 @@
 }
 .input-area {
   display: flex;
-  padding: 10px 15px 15px 15px;
-  border-top: 1px solid #f0f0f0;
-  background: #fff;
-}
-.input-area input {
-  flex: 1;
-  padding: 10px 16px;
-  border: 1.5px solid #e0e0e0;
-  border-radius: 22px;
-  margin-right: 10px;
-  font-size: 15px;
-  outline: none;
-  background: #f8fafc;
-  transition: border 0.2s;
-}
-.input-area input:focus {
-  border-color: #007bff;
-  background: #fff;
-}
-.send-btn {
-  padding: 0 18px;
-  background: linear-gradient(135deg, #007bff 60%, #5bc0eb 100%);
-  color: #fff;
-  border: none;
-  border-radius: 22px;
-  cursor: pointer;
-  display: flex;
+  padding: 15px;
+  border-top: 1px solid #eee;
+  background-color: #fff;
   align-items: center;
-  justify-content: center;
-  height: 44px;
-  transition: background 0.2s, box-shadow 0.2s;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
-.send-btn:hover {
-  background: linear-gradient(135deg, #0069d9 60%, #4fa3e3 100%);
-  box-shadow: 0 2px 8px rgba(0,123,255,0.08);
+.input-area input[type="text"] {
+  flex-grow: 1;
+  padding: 10px 15px;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  margin-right: 10px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
 }
-.send-btn svg {
-  color: white;
+.input-area input[type="text"]:focus {
+  border-color: #007bff;
+}
+.input-area input[type="text"]:disabled {
+  background-color: #f8f9fa; /*  हल्का ग्रे बैकग्राउंड */
 }
 
-/* 新增：清空按钮样式 */
-.clear-btn {
-  background-color: #dc3545; /* 红色背景 */
+/* 新增：发送按钮和 Service 下拉框的容器 */
+.send-service-group {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ccc; /* 统一边框 */
+  border-radius: 20px; /* 统一圆角 */
+  overflow: hidden; /* 隐藏内部元素的超出部分，确保圆角效果 */
+  height: 42px; /* 与输入框高度一致 */
+  margin-left: 5px; /* 与输入框的间距 */
+  transition: border-color 0.2s;
+}
+
+.send-service-group:focus-within {
+  border-color: #007bff; /* 获得焦点时边框变蓝 */
+}
+
+/* 调整组内发送按钮样式 */
+.send-service-group .send-btn {
+  background-color: #007bff;
   color: white;
   border: none;
-  padding: 10px;
-  border-radius: 50%;
+  padding: 0 12px;
+  height: 100%; /* 占满容器高度 */
+  border-radius: 0; /* 移除独立圆角 */
   cursor: pointer;
-  margin-left: 8px; /* 和发送按钮保持一点距离 */
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.2s;
+  border-right: 1px solid rgba(255, 255, 255, 0.3); /* 添加分隔线 */
+}
+
+.send-service-group .send-btn:hover {
+  background-color: #0056b3;
+}
+
+.send-service-group .send-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  border-right-color: rgba(0, 0, 0, 0.1);
+}
+
+.send-service-group .send-btn:disabled svg {
+  color: #888; /* 禁用时图标颜色 */
+}
+
+/* 调整组内 Service 下拉框样式 */
+.send-service-group .service-select {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  height: 100%; /* 占满容器高度 */
+  border-radius: 0; /* 移除独立圆角 */
+  padding: 0 10px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  min-width: 90px;
+  outline: none; /* 移除默认 outline */
+  transition: background-color 0.2s;
+}
+
+.send-service-group .service-select:hover {
+  background-color: #5a6268;
+}
+
+.send-service-group .service-select:disabled {
+  background-color: #cccccc;
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* 调整单独的清空按钮样式 */
+.clear-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 50%; /* 圆形按钮 */
+  width: 42px; /* 固定宽高使其为圆形 */
+  height: 42px;
+  padding: 0;
+  margin-left: 10px; /* 与按钮组的间距 */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
 }
 
 .clear-btn:hover {
-  background-color: #c82333; /* 悬停时深红色 */
+  background-color: #c82333;
 }
 
+.clear-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.clear-btn:disabled svg {
+  color: #888;
+}
+
+.send-btn svg,
 .clear-btn svg {
-  color: white;
+  width: 20px;
+  height: 20px;
 }
 
 @media (max-width: 500px) {

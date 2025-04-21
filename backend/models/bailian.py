@@ -3,11 +3,7 @@ from typing import Optional, Dict, List
 from .chat import ChatInputMessage, ChatModelUsages
 
 # 百炼 API 请求体结构
-class BailianPayloadInputMessage(ChatInputMessage): # 可以复用 ChatInputMessage 结构
-    pass
-
 class BailianPayloadInput(BaseModel):
-    messages: Optional[List[BailianPayloadInputMessage]] = None
     prompt: Optional[str] = None
     session_id: Optional[str] = None
     biz_params: Optional[Dict] = {} # 改为 Optional

@@ -5,7 +5,7 @@
 
 ## 技术栈
 - 前端：React + Vite + Axios
-- 后端：FastAPI + Uvicorn + Pydantic + python-dotenv + requests
+- 后端：FastAPI + Uvicorn + Pydantic + python-dotenv + httpx
 - 部署：开发模式运行
 
 ## 功能特性
@@ -21,11 +21,14 @@
      cp frontend/.env.example frontend/.env
      ```
    - 后端配置(`backend/.env`):
-     - BAILIAN_API_URL: 百炼平台API地址
+     - BAILIAN_BASE_API_URL: 百炼平台API地址
      - BAILIAN_API_KEY: 百炼平台API密钥
-     - 其他平台（如coze等）参考`backend/.env.example`
+     - COZE_BASE_URL: Coze平台API基础地址
+     - COZE_API_KEY: Coze平台API密钥
+     - COZE_WORKFLOW_ID: Coze平台要运行的工作流ID
+     # 根据 backend/.env.example 补充其他平台
    - 前端配置(`frontend/.env`):
-     - REACT_APP_API_BASE_URL: 后端服务地址(默认http://localhost:8000)
+     - REACT_APP_API_BASE_URL: 后端服务地址(默认http://localhost:8000/api)
 
 ## 快速开始
 
@@ -33,33 +36,38 @@
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev # 使用 npm run dev 启动 Vite 开发服务器
 ```
 
 ### 后端启动
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn app:app --reload --host 0.0.0.0 --port 8000
-# 或者将整个backend目录当作一个python模块运行
-cd project-root/
-python -m backend.app -v
+uvicorn main:app --reload --host 0.0.0.0 --port 8000 # 修改入口点为 main:app
+# 或者将整个backend目录当作一个python模块运行 (如果 main.py 在 backend/)
+# cd project-root/
+# python -m backend.main -v # 假设启动逻辑在 main.py
 ```
 
 ## 项目结构
 ```
 project-root/
 ├── frontend/        # React前端
+│   ├── public/
 │   ├── src/        # 源代码
-│   └── package.json # 依赖配置
+│   ├── .env.example
+│   ├── index.html
+│   ├── package.json # 依赖配置
+│   └── vite.config.js
 ├── backend/         # FastAPI后端
-│   ├── app.py      # 主应用 (FastAPI实例, 中间件, 路由包含, 启动)
+│   ├── __init__.py
+│   ├── main.py     # FastAPI 应用入口 (替代 app.py)
 │   ├── config.py   # 配置加载
 │   ├── models/     # Pydantic模型
 │   │   ├── __init__.py
 │   │   ├── bailian.py
 │   │   ├── chat.py
-│   │   └── common.py
+│   │   └── coze.py    # Coze 模型文件
 │   ├── routers/    # API路由
 │   │   ├── __init__.py
 │   │   ├── chat.py
@@ -67,13 +75,15 @@ project-root/
 │   ├── services/   # 外部服务调用逻辑
 │   │   ├── __init__.py
 │   │   ├── bailian.py
-│   │   └── coze.py   # Coze API 占位符
-│   ├── .env        # 环境配置
+│   │   └── coze.py    # Coze API 调用实现
+│   ├── .env.example # 环境变量示例
+│   ├── .env        # 环境配置 (gitignored)
 │   └── requirements.txt # 依赖文件
 └── README.md       # 项目文档
 ```
 
 ## 注意事项
-1. 确保已安装Node.js和Python环境
-2. 开发时需同时运行前后端服务
-3. 生产环境需要额外配置
+1. 确保已安装Node.js (>=16) 和 Python (>=3.8) 环境。
+2. 开发时需同时运行前后端服务。
+3. 生产环境部署需要考虑使用 Gunicorn + Uvicorn worker，并配置反向代理（如 Nginx）。
+4. 请务必在 `.env` 文件中配置好所需的 API Key 和 URL。
