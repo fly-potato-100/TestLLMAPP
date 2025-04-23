@@ -60,5 +60,5 @@ alwaysApply: false
 
 - 阿里云百炼应用调用文档: <https://help.aliyun.com/zh/model-studio/user-guide/application-calling/>
 - Coze 工作流运行 API 文档: <https://www.coze.cn/open/docs/developer_guides/workflow_run>
-- 火山方舟 API 文档: <https://www.volcengine.com/docs/82379/1298454>
+- 火山方舟 API 文档: <https://www.volcengine.com/docs/82379/1494384>
 - 当前项目 `README.md` 中描述的技术栈和架构。
