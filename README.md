@@ -1,7 +1,7 @@
 # AI聊天网页Demo项目
 
 ## 项目概述
-基于React和FastAPI实现的AI聊天网页Demo，前端提供简洁聊天界面，后端作为百炼、coze、dify等平台API代理。
+基于React和FastAPI实现的AI聊天网页Demo，前端提供简洁聊天界面，后端作为百炼、coze、火山方舟等平台API代理。
 
 ## 技术栈
 - 前端：React + Vite + Axios
@@ -26,7 +26,7 @@
      - COZE_BASE_URL: Coze平台API基础地址
      - COZE_API_KEY: Coze平台API密钥
      - COZE_WORKFLOW_ID: Coze平台要运行的工作流ID
-     # 根据 backend/.env.example 补充其他平台
+     - 根据 backend/.env.example 补充其他平台
    - 前端配置(`frontend/.env`):
      - REACT_APP_API_BASE_URL: 后端服务地址(默认http://localhost:8000/api)
 
