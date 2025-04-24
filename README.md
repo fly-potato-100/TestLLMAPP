@@ -60,6 +60,9 @@ project-root/
 │   ├── __init__.py
 │   ├── main.py     # FastAPI 应用入口 (替代 app.py)
 │   ├── config.py   # 配置加载
+│   ├── agents/     # AI-agent实现的服务
+│   │   ├── __init__.py
+│   │   └── faq_filter_agent # faq筛选器agent（详见目录内的`README.md`）
 │   ├── models/     # Pydantic模型
 │   │   ├── __init__.py
 │   │   ├── bailian.py
