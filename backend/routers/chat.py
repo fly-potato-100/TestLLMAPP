@@ -2,6 +2,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 # 导入前端请求/响应模型和特定服务的调用函数
+from backend.agents.faq_filter_agent.agent import FAQFilterAgent
 import backend.config as config
 from backend.models.chat import ChatRequest, ChatResponse
 from backend.services.bailian import call_bailian_api
@@ -34,6 +35,11 @@ async def chat_proxy(chat_request: ChatRequest):
             if not config.check_coze_vars():
                 raise HTTPException(status_code=500, detail="Coze service configuration is missing.")
             return await call_coze_api(chat_request) # 调用 Coze 服务
+
+        elif service_to_call == "agent":
+            logging.info("Routing request to FAQ filter agent.")
+            faq_filter_agent = FAQFilterAgent()
+            return await faq_filter_agent.process_user_request(chat_request) # 调用 Custom Agent 服务
 
         else:
              # 如果服务名称无效

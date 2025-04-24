@@ -42,4 +42,4 @@
 
 ## 测试
 
-建议在 `backend/tests/custom_agent/` 目录下为各组件编写单元测试，利用 Mock 对象模拟 LLM API 调用和文件读取，以实现独立的模块测试。 
+建议在 `backend/tests/faq_filter_agent/` 目录下为各组件编写单元测试，利用 Mock 对象模拟 LLM API 调用和文件读取，以实现独立的模块测试。 

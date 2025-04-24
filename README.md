@@ -36,18 +36,15 @@
 ```bash
 cd frontend
 npm install
-npm run dev # 使用 npm run dev 启动 Vite 开发服务器
+npm start
 ```
 
 ### 后端启动
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000 # 修改入口点为 main:app
-# 或者将整个backend目录当作一个python模块运行 (如果 main.py 在 backend/)
-# cd project-root/
-# python -m backend.main -v # 假设启动逻辑在 main.py
-```
+cd ..
+python -m backend.app -v
 
 ## 项目结构
 ```

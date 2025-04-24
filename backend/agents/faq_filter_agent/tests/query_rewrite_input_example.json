@@ -10,11 +10,11 @@
         },
         {
             "role": "user",
-            "content": "我忘记密码了，怎么找回？"
+            "content": "我客户端玩着玩着老闪退"
         }
     ],
     "context": {
         "channel": "小米渠道",
-        "platform": "android",
+        "platform": "android"
     }
 }

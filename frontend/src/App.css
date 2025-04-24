@@ -474,4 +474,57 @@
 .candidate-label {
   display: inline-block;
   min-width: 4em;
+  margin-right: 5px;
+}
+
+/* 新增：候选答案表格样式 */
+.candidate-table {
+  width: 100%;
+  border-collapse: collapse; /* 合并边框 */
+  margin-top: 5px;
+}
+
+.candidate-table th, .candidate-table td {
+  border: 1px solid #eee; /* 添加细边框 */
+  padding: 6px 8px; /* 单元格内边距 */
+  text-align: left;
+}
+
+.candidate-table th {
+  background-color: #f8f9fa; /* 表头背景色 */
+  font-weight: bold;
+  font-size: 0.9em; /* 字体稍微小一点 */
+}
+
+/* 列宽设置 */
+.candidate-table .col-select {
+  width: 5%;
+}
+.candidate-table .col-score {
+  width: 5%;
+}
+.candidate-table .col-answer {
+  width: 50%;
+}
+.candidate-table .col-reason {
+  width: 40%;
+}
+
+/* 选中行的样式 */
+.candidate-table tr.selected td {
+  background-color: #e6f7ff; /* 浅蓝色背景 */
+}
+
+.candidate-table td input[type="radio"] {
+  vertical-align: middle; /* 垂直居中单选按钮 */
+}
+
+.candidate-table .candidate-score {
+  font-family: monospace; /* 等宽字体 */
+}
+
+.candidate-table .candidate-reason {
+  color: #555; /* 原因文字颜色稍深 */
+  font-size: 0.9em;
+  white-space: pre-wrap; /* 新增：保留换行符和空格 */
 }

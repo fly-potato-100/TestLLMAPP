@@ -43,29 +43,39 @@ function CandidateAnswers({ answers, selectedIndex, onSelect, groupName }) {
   return (
     <div className="candidate-answers">
       <div className="candidate-title">候选答案：</div>
-      <ul>
-        {answers.map((item, index) => (
-          <li key={index}>
-            <label className="candidate-item">
-              <input
-                type="radio"
-                name={groupName}
-                checked={index === selectedIndex}
-                onChange={() => onSelect(index)}
-              />
-              <span className="candidate-score" style={{ color: 'gray' }}>
-                [{((item.score || 0) * 100).toFixed(1)}%]
-              </span>
-              <span className="candidate-label" style={{ fontWeight: 'bold' }}>
-                答案{index + 1}：
-              </span>
-              <span className="candidate-text">
+      <table className="candidate-table">
+        <thead>
+          <tr>
+            <th className="col-select">选择</th>
+            <th className="col-score">分数</th>
+            <th className="col-answer">答案</th>
+            <th className="col-reason">原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          {answers.map((item, index) => (
+            <tr key={index} className={index === selectedIndex ? 'selected' : ''}>
+              <td>
+                <input
+                  type="radio"
+                  name={groupName}
+                  checked={index === selectedIndex}
+                  onChange={() => onSelect(index)}
+                />
+              </td>
+              <td className="candidate-score">
+                {((item.score || 0) * 100).toFixed(1)}%
+              </td>
+              <td className="candidate-text">
                 {item.content}
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
+              </td>
+              <td className="candidate-reason">
+                {item.reason || '-'} {/* 如果没有 reason，显示 '-' */}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -77,7 +87,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [channelName, setChannelName] = useState('官方');
   const [platformName, setPlatformName] = useState('android');
-  const [serviceName, setServiceName] = useState('bailian');
+  const [serviceName, setServiceName] = useState('agent');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -160,10 +170,7 @@ function App() {
 
       } catch (e) {
         // 如果 JSON 解析失败，说明返回的不是预期的 JSON 格式，直接将原始文本作为回复
-        console.warn("Failed to parse response_text as JSON, using raw text:", e);
-        aiResponseText = rawResponse;
-        candidates = [];
-        selectedIndex = 0;
+        throw new Error("后台报错:" + rawResponse);
       }
 
       const aiMessage = {
@@ -186,7 +193,7 @@ function App() {
       
       // 使用函数式更新
       const errorMessage = { 
-          text: `发送消息失败: ${error.response?.data?.error || error.message || '未知错误'}`, 
+          text: `${error.response?.data?.error || error.message || '未知错误'}`, 
           sender: 'error', 
           time: new Date().toLocaleTimeString() 
       };
@@ -295,6 +302,7 @@ function App() {
             <select className="service-select" value={serviceName} onChange={(e) => setServiceName(e.target.value)} disabled={isLoading}>
               <option value="bailian">Bailian</option>
               <option value="coze">Coze</option>
+              <option value="agent">Agent</option>
             </select>
           </div>
           <button className="clear-btn" onClick={handleClear} aria-label="清空" disabled={isLoading}>

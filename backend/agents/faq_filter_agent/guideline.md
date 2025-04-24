@@ -27,3 +27,6 @@
 - 该项目最终会作为模块，被上层的http代理服务（源码在`backend`目录）所使用（其文档参考整个项目根目录的`README.md`），所以模块接口要考虑方便接入
 - 该模块要能支持便捷的单独测试
 - 尽量用python类和模块设计，以符合最佳实践
+
+## 参考资料
+- 模块目录的README文档：`backend/agents/faq_filter_agent/README.md`
