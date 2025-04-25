@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Tuple, Optional, Union
 import jinja2 # Import Jinja2
 
 from .exceptions import LLMAPIError, LLMResponseError
+from backend.models.chat import ChatModelUsage # 导入 ChatModelUsage
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,15 @@ class VolcanoLLMClient:
         top_p: Optional[float] = None,
         max_tokens: Optional[int] = None,
         response_format: Optional[Dict[str, str]] = None # For JSON mode
-    ) -> Dict[str, Any]:
-        """内部方法，调用火山方舟 /chat/completions API。"""
+    ) -> Tuple[str, ChatModelUsage, Dict[str, Any]]:
+        """内部方法，调用火山方舟 /chat/completions API。
+
+        Returns:
+            Tuple[str, ChatModelUsage, Dict[str, Any]]: 一个包含以下内容的元组:
+                - 响应消息的内容 (str)
+                - 包含模型ID和token使用量的 ChatModelUsage 对象
+                - 原始的API响应字典 (Dict[str, Any])
+        """
         api_url = f"{self.api_base}/chat/completions"
         request_body = {
             "model": self.model_name,
@@ -98,16 +106,34 @@ class VolcanoLLMClient:
             response_data = response.json()
             # Log the raw response at DEBUG level
             logger.debug(f"Raw Volcano API response: {json.dumps(response_data, indent=2, ensure_ascii=False)}")
+
+            # Check for errors in the response body *before* trying to extract data
             if 'error' in response_data and response_data['error']:
                 error_info = response_data['error']
                 error_message = error_info.get('message', json.dumps(error_info))
                 logger.error(f"Volcano API returned error in response body: {error_message}")
                 raise LLMAPIError(f"API returned error: {error_message}")
-            return response_data
+
+            # Extract the desired data
+            content = response_data['choices'][0]['message']['content']
+
+            # Extract usage information safely
+            usage = ChatModelUsage(
+                model_id=response_data['model'],
+                input_tokens=response_data['usage']['prompt_tokens'],
+                output_tokens=response_data['usage']['completion_tokens']
+            )
+
+            # Return the tuple
+            return content, usage, response_data
+
         except json.JSONDecodeError as e:
             logger.error(f"Failed to decode JSON response from Volcano API: {response.text}")
             raise LLMResponseError(f"Failed to decode API JSON response: {e}") from e
-        
+        except (KeyError, IndexError, TypeError) as e: # Catch potential issues accessing nested data
+             logger.error(f"Failed to parse expected data from Volcano API response. Response: {response_data}. Error: {e}")
+             raise LLMResponseError(f"Unexpected API response structure: {e}") from e
+
     # 对于llm的返回的json，如果llm意外的将其包在了```json ... ```中，则需要去掉这些json的包裹
     def remove_json_wrapper(self, content: str) -> str:
         """Remove JSON wrapper from content if present."""
@@ -138,7 +164,7 @@ class QueryRewriteClient(VolcanoLLMClient):
         self,
         input_data: Dict[str, Any], # Merge conversation and context
         timeout: float = DEFAULT_TIMEOUT
-    ) -> Dict[str, str]:
+    ) -> Tuple[Dict[str, Any], ChatModelUsage]:
         """异步调用 LLM API 来重写查询。
 
         Args:
@@ -146,7 +172,9 @@ class QueryRewriteClient(VolcanoLLMClient):
             timeout: 请求超时时间 (秒)。
 
         Returns:
-            包含 'query_rewrite' 和 'reason' 的字典。
+            Tuple[Dict[str, Any], ChatModelUsage]: 一个包含以下内容的元组:
+                - 包含 'query_rewrite' 和 'reason' 的字典。
+                - 包含模型ID和token使用量的 ChatModelUsage 对象。
 
         Raises:
             LLMAPIError: 如果 API 调用失败。
@@ -183,7 +211,7 @@ class QueryRewriteClient(VolcanoLLMClient):
 
         # 2. 调用基类 API 方法 (requesting JSON output)
         try:
-            response_data = await self._call_api(
+            content, usage, response_data = await self._call_api(
                 messages=messages,
                 timeout=timeout,
                 temperature=0.1, # Low temp for deterministic rewrite
@@ -197,26 +225,17 @@ class QueryRewriteClient(VolcanoLLMClient):
 
         # 3. 解析特定于重写的响应内容
         try:
-            content_str = response_data.get('choices', [{}])[0].get('message', {}).get('content')
-            if not content_str:
-                logger.error(f"Query rewrite response missing expected content. Response: {response_data}")
-                raise LLMResponseError("API response did not contain valid content for rewrite.")
-
-            result = json.loads(self.remove_json_wrapper(content_str))
+            result = json.loads(self.remove_json_wrapper(content))
             if not isinstance(result, dict) or 'query_rewrite' not in result or 'reason' not in result:
-                logger.error(f"Query rewrite response JSON content is malformed. Parsed: {result}, Original: '{content_str}'")
+                logger.error(f"Query rewrite response JSON content is malformed. Parsed: {result}, Original: '{content}'")
                 raise LLMResponseError("LLM response content is not the expected rewrite JSON format.")
 
             logger.info(f"Successfully rewrote query using model {self.model_name}.")
-            return result
+            return result, usage
 
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to decode JSON from query rewrite response content: '{content_str}'. Error: {e}")
-            raise LLMResponseError(f"Failed to decode JSON from LLM rewrite response: {e}. Content: '{content_str}'") from e
-        except (KeyError, IndexError, TypeError) as e:
-            logger.error(f"Failed to parse query rewrite API response structure. Response: {response_data}. Error: {e}")
-            raise LLMResponseError(f"Unexpected API response structure for rewrite: {e}") from e
-
+            logger.error(f"Failed to decode JSON from query rewrite response content: '{content}'. Error: {e}")
+            raise LLMResponseError(f"Failed to decode JSON from LLM rewrite response: {e}. Content: '{content}'") from e
 
 class FAQClassifierClient(VolcanoLLMClient):
     """使用火山方舟 LLM API 进行异步问题分类。"""
@@ -245,7 +264,7 @@ class FAQClassifierClient(VolcanoLLMClient):
         rewritten_query: str,
         faq_structure_md: str,
         timeout: float = DEFAULT_TIMEOUT
-    ) -> Dict[str, str]:
+    ) -> Tuple[Dict[str, Any], ChatModelUsage]:
         """异步调用火山方舟 LLM API 对重写后的查询进行分类。
 
         Args:
@@ -254,7 +273,9 @@ class FAQClassifierClient(VolcanoLLMClient):
             timeout: 请求超时时间 (秒)。
 
         Returns:
-            包含 'category_key_path' 和 'reason' 的字典。
+            Tuple[Dict[str, Any], ChatModelUsage]: 一个包含以下内容的元组:
+                - 包含 'category_key_path' 和 'reason' 的字典。
+                - 包含模型ID和token使用量的 ChatModelUsage 对象。
 
         Raises:
             LLMAPIError: 如果 API 调用失败。
@@ -283,10 +304,10 @@ class FAQClassifierClient(VolcanoLLMClient):
 
         # 2. 调用基类 API 方法 (requesting JSON output)
         try:
-            response_data = await self._call_api(
+            content, usage, _ = await self._call_api(
                 messages=messages,
                 timeout=timeout,
-                temperature=0.1, # Low temp for classification
+                temperature=0.01, # Low temp for classification
                 response_format={"type": "json_object"} # Request JSON
             )
         except (LLMAPIError, LLMResponseError):
@@ -297,24 +318,15 @@ class FAQClassifierClient(VolcanoLLMClient):
 
         # 3. 解析特定于分类的响应内容
         try:
-            content_str = response_data.get('choices', [{}])[0].get('message', {}).get('content')
-            if not content_str:
-                logger.error(f"FAQ classification response missing expected content. Response: {response_data}")
-                raise LLMResponseError("API response did not contain valid content for classification.")
-
-            logger.debug(f"LLM classification content to parse: {content_str}")
-            result = json.loads(self.remove_json_wrapper(content_str))
+            result = json.loads(self.remove_json_wrapper(content))
 
             if not isinstance(result, dict) or 'category_key_path' not in result or 'reason' not in result:
-                logger.error(f"FAQ classification response JSON content is malformed. Parsed: {result}. Original: '{content_str}'")
+                logger.error(f"FAQ classification response JSON content is malformed. Parsed: {result}. Original: '{content}'")
                 raise LLMResponseError("LLM response content is not the expected classification JSON format ({category_key_path, reason}).")
 
             logger.info(f"Successfully classified query using model {self.model_name}. Path: {result['category_key_path']}")
-            return result
+            return result, usage
 
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to decode JSON from FAQ classification response content: '{content_str}'. Error: {e}")
-            raise LLMResponseError(f"Failed to decode JSON from LLM classification response: {e}. Content: '{content_str}'") from e
-        except (KeyError, IndexError, TypeError) as e:
-            logger.error(f"Failed to parse FAQ classification API response structure. Response: {response_data}. Error: {e}", exc_info=True)
-            raise LLMResponseError(f"Unexpected API response structure for classification: {e}") from e
+            logger.error(f"Failed to decode JSON from FAQ classification response content: '{content}'. Error: {e}")
+            raise LLMResponseError(f"Failed to decode JSON from LLM classification response: {e}. Content: '{content}'") from e

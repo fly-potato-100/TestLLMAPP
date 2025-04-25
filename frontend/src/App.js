@@ -184,6 +184,8 @@ function App() {
       };
       // --- 处理结束 ---
 
+      console.log('AI message:', aiMessage);
+
       setMessages(prev => [...prev, aiMessage]);
       // 更新当前 session_id 以备下次请求使用
       setCurrentSessionId(response.data.session_id);
@@ -274,6 +276,7 @@ function App() {
               <option value="华为">华为</option>
               <option value="苹果">苹果</option>
               <option value="官方">官方</option>
+              <option value="祖龙">祖龙</option>
             </select>
           </label>
           <label>

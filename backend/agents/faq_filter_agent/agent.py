@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 # Use relative import based on project structure
 from .data_parser import FAQDataParser
 from .llm_clients import QueryRewriteClient, FAQClassifierClient
-from ...models.chat import ChatRequest, ChatResponse, ChatCandidate # Adjusted import path
+from ...models.chat import ChatRequest, ChatResponse, ChatCandidate, ChatModelUsages # Adjusted import path
 from . import config # Import config module
 from .exceptions import ConfigurationError, PromptLoadError # Import custom exceptions
 
@@ -90,6 +90,7 @@ class FAQFilterAgent:
         """
         logger.info(f"--- FAQFilterAgent: process_user_request called (Session ID: {chat_request.session_id}) ---")
 
+
         # Extract conversation history and context from ChatRequest
         # Convert ChatInputMessage objects to the dict format expected by rewrite_client
         conversation_dicts = [{"role": msg.role, "content": msg.content} for msg in chat_request.conversation]
@@ -103,7 +104,7 @@ class FAQFilterAgent:
 
         # 1. 查询重写 (Query Rewrite)
         try:
-            rewritten_data = await self.rewrite_client.rewrite_query(input_data=rewrite_input_data)
+            rewritten_data, rewritten_usage = await self.rewrite_client.rewrite_query(input_data=rewrite_input_data)
             if not rewritten_data or 'query_rewrite' not in rewritten_data:
                 logger.error("Failed to rewrite query: LLM did not return expected 'query_rewrite' field.")
                 # TODO: Handle rewrite failure more gracefully
@@ -143,7 +144,7 @@ class FAQFilterAgent:
 
         # 3. 问题分类 (Classification)
         try:
-            classification_data = await self.classifier_client.classify_query(rewritten_query, faq_structure_md)
+            classification_data, classification_usage = await self.classifier_client.classify_query(rewritten_query, faq_structure_md)
             if not classification_data or 'category_key_path' not in classification_data:
                 logger.error("Failed to classify query: LLM did not return expected 'category_key_path' field.")
                 # TODO: Handle classification failure
@@ -177,6 +178,8 @@ class FAQFilterAgent:
         # 5. 返回结果
         # 定义保底答案
         fallback_answer = "<保底话术>未找到具体答案。"
+        # 将所有使用量合并到usages中
+        usages = ChatModelUsages(models=[rewritten_usage, classification_usage])
         if breadcrumb_str is not None:
             # breadcrumb_str不为空表明类别键路径是有效的，但未匹配到具体答案
             logger.info(f"Retrieved Answer by path: {breadcrumb_str}, answer_size: { 'N/A' if final_answer is None else len(final_answer)}") # Log snippet
@@ -184,11 +187,12 @@ class FAQFilterAgent:
             candidate = ChatCandidate(
                 content=final_answer, 
                 score=1.0, 
-                reason=f"分类路径：{breadcrumb_str}\n分类依据：{classification_reason}"
+                reason=f"分类路径：{category_key_path}（{breadcrumb_str}）\n分类依据：{classification_reason}"
                 )
             return ChatResponse(
                 response_text=json.dumps([candidate.model_dump()]),
-                session_id=chat_request.session_id
+                session_id=chat_request.session_id,
+                usages=usages
             )
         else:
             # 未找到具体答案
@@ -200,5 +204,6 @@ class FAQFilterAgent:
             )
             return ChatResponse(
                 response_text=json.dumps([candidate.model_dump()]),
-                session_id=chat_request.session_id
+                session_id=chat_request.session_id,
+                usages=usages
             )   
