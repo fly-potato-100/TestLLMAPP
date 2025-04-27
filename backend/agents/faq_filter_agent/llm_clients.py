@@ -274,7 +274,7 @@ class FAQClassifierClient(VolcanoLLMClient):
 
         Returns:
             Tuple[Dict[str, Any], ChatModelUsage]: 一个包含以下内容的元组:
-                - 包含 'category_key_path' 和 'reason' 的字典。
+                - 包含 'category_key_path' 和 'reason' 的字典的列表。
                 - 包含模型ID和token使用量的 ChatModelUsage 对象。
 
         Raises:
@@ -284,7 +284,7 @@ class FAQClassifierClient(VolcanoLLMClient):
         # 1. 构建 Prompt using Jinja2
         try:
             # Render the template using Jinja2
-            system_prompt_content = self.jinja_template.render(faq_structure=faq_structure_md)
+            system_prompt_content = self.jinja_template.render(faq_structure=faq_structure_md, faq_retrieve_num=3)
 
             # 构建火山方舟需要的 messages 格式
             messages = [
@@ -318,14 +318,14 @@ class FAQClassifierClient(VolcanoLLMClient):
 
         # 3. 解析特定于分类的响应内容
         try:
-            result = json.loads(self.remove_json_wrapper(content))
+            results = json.loads(self.remove_json_wrapper(content))
 
-            if not isinstance(result, dict) or 'category_key_path' not in result or 'reason' not in result:
-                logger.error(f"FAQ classification response JSON content is malformed. Parsed: {result}. Original: '{content}'")
+            if not isinstance(results, list) or not all(isinstance(item, dict) and 'category_key_path' in item and 'reason' in item for item in results):
+                logger.error(f"FAQ classification response JSON content is malformed. Parsed: {results}. Original: '{content}'")
                 raise LLMResponseError("LLM response content is not the expected classification JSON format ({category_key_path, reason}).")
 
-            logger.info(f"Successfully classified query using model {self.model_name}. Path: {result['category_key_path']}")
-            return result, usage
+            logger.info(f"Successfully classified query using model {self.model_name}. Paths: {', '.join([item['category_key_path'] for item in results])}")
+            return results, usage
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to decode JSON from FAQ classification response content: '{content}'. Error: {e}")

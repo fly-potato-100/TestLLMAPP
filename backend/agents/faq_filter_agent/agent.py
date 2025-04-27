@@ -154,7 +154,7 @@ class FAQFilterAgent:
         # 3. 问题分类 (Classification)
         try:
             classification_data, classification_usage = await self.classifier_client.classify_query(rewritten_query, faq_structure_md)
-            if not classification_data or 'category_key_path' not in classification_data:
+            if not classification_data or not all('category_key_path' in item for item in classification_data):
                 logger.error("Failed to classify query: LLM did not return expected 'category_key_path' field.")
                 # TODO: Handle classification failure
                 return ChatResponse(
@@ -162,10 +162,15 @@ class FAQFilterAgent:
                     session_id=chat_request.session_id
                 )
 
-            category_key_path = classification_data['category_key_path']
-            classification_reason = classification_data.get('reason', 'N/A')
-            logger.info(f"Classification Path: {category_key_path}")
-            logger.info(f"Classification Reason: {classification_reason}")
+            result_list = []
+            for index, item in enumerate(classification_data):
+                result = {
+                    'category_key_path': item['category_key_path'],
+                    'reason': item['reason']
+                }
+                logger.info(f"Classification({index}) Path: {result['category_key_path']}")
+                logger.info(f"Classification({index}) Reason: {result['reason']}")
+                result_list.append(result)
         except Exception as e:
             logger.exception(f"Error during query classification: {e}")
             return ChatResponse(
@@ -174,45 +179,48 @@ class FAQFilterAgent:
              )
 
         # 4. 答案检索
-        try:
-            # Attempt to get the answer using the classified path
-            final_answer, breadcrumb_str = self.faq_parser.get_answer_by_key_path(category_key_path)
-        except Exception as e:
-             logger.exception(f"Error during answer retrieval for path '{category_key_path}': {e}")
-             return ChatResponse(
-                  response_text="An error occurred while retrieving the answer.",
-                  session_id=chat_request.session_id
-              )
+        for result in result_list:
+            try:
+                # Attempt to get the answer using the classified path
+                final_answer, breadcrumb_str = self.faq_parser.get_answer_by_key_path(result['category_key_path'])
+                result['final_answer'] = final_answer
+                result['breadcrumb_str'] = breadcrumb_str
+            except Exception as e:
+                logger.exception(f"Error during answer retrieval for path '{result['category_key_path']}': {e}")
+                return ChatResponse(
+                    response_text="An error occurred while retrieving the answer.",
+                    session_id=chat_request.session_id
+                )
         
         # 5. 返回结果
         # 定义保底答案
         fallback_answer = "<保底话术>未找到具体答案。"
         # 将所有使用量合并到usages中
         usages = ChatModelUsages(models=[rewritten_usage, classification_usage])
-        if breadcrumb_str is not None:
-            # breadcrumb_str不为空表明类别键路径是有效的，但未匹配到具体答案
-            logger.info(f"Retrieved Answer by path: {breadcrumb_str}, answer_size: { 'N/A' if final_answer is None else len(final_answer)}") # Log snippet
-            final_answer = final_answer or fallback_answer
-            candidate = ChatCandidate(
-                content=final_answer, 
-                score=1.0, 
-                reason=f"分类路径：{category_key_path}（{breadcrumb_str}）\n分类依据：{classification_reason}"
-                )
-            return ChatResponse(
-                response_text=json.dumps([candidate.model_dump()]),
-                session_id=chat_request.session_id,
-                usages=usages
-            )
-        else:
-            # 未找到具体答案
-            logger.info("No specific answer found for the query.")
-            candidate = ChatCandidate(
-                content=fallback_answer, 
-                score=0.0, 
-                reason=f"依据：{classification_reason}"
-            )
-            return ChatResponse(
-                response_text=json.dumps([candidate.model_dump()]),
-                session_id=chat_request.session_id,
-                usages=usages
-            )   
+
+        candidates = []
+
+        for result in result_list:  
+            if result['breadcrumb_str'] is not None:
+                # breadcrumb_str不为空表明类别键路径是有效的，但未匹配到具体答案
+                logger.info(f"Retrieved Answer by path: {result['breadcrumb_str']}, answer_size: { 'N/A' if result['final_answer'] is None else len(result['final_answer'])}") # Log snippet
+                final_answer = result['final_answer'] or fallback_answer
+                candidates.append(ChatCandidate(
+                    content=final_answer, 
+                    score=1.0, 
+                    reason=f"分类路径：{result['category_key_path']}（{result['breadcrumb_str']}）\n分类依据：{result['reason']}"
+                ))
+            else:
+                # 未找到具体答案
+                logger.info("No specific answer found for the query.")
+                candidates.append(ChatCandidate(
+                    content=fallback_answer, 
+                    score=0.0, 
+                    reason=f"依据：{result['reason']}"
+                ))
+
+        return ChatResponse(
+            response_text=json.dumps([candidate.model_dump() for candidate in candidates]),
+            session_id=chat_request.session_id,
+            usages=usages
+        )

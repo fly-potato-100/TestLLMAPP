@@ -89,6 +89,7 @@
   color: #333;
   align-self: flex-start;
   margin-left: 10px;
+  white-space: pre-wrap;
 }
 .message.error {
   align-self: center;

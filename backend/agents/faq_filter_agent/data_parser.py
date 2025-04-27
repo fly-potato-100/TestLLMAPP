@@ -51,7 +51,7 @@ class FAQDataParser:
             raise FAQDataError(f"An unexpected error occurred: {e}") from e
 
     def get_category_structure_markdown(self, max_depth: int = -1) -> str:
-        """生成 Markdown 格式的 FAQ 目录结构字符串。
+        """生成 Markdown 格式的 FAQ 目录结构字符串，类似 test_faq_categories.md 格式。
 
         Args:
             max_depth: 最大递归层数。-1 表示无限制，正整数 n 表示最大生成 n 层目录。
@@ -61,27 +61,38 @@ class FAQDataParser:
             Markdown 格式的目录结构字符串。
         """
         logger.debug(f"Generating category structure markdown with max_depth={max_depth}")
-        markdown_structure = self._generate_markdown_recursive(self.faq_data, 0, max_depth)
+        # Start recursion with indent level 0 and empty path prefix
+        markdown_structure = self._generate_markdown_recursive(self.faq_data, 0, max_depth, "")
         logger.debug("Generated category structure markdown.")
         return markdown_structure
 
-    def _generate_markdown_recursive(self, categories: List[Dict[str, Any]], indent_level: int, max_depth: int) -> str:
-        """递归辅助函数，生成 Markdown 结构。
+    def _generate_markdown_recursive(self, categories: List[Dict[str, Any]], indent_level: int, max_depth: int, path_prefix: str) -> str:
+        """递归辅助函数，生成层级编号的 Markdown 结构。
 
         Args:
             categories: 当前层级的 FAQ 类别列表。
             indent_level: 当前的缩进层级 (0-based)。
             max_depth: 最大递归层数限制。
+            path_prefix: 当前类别的路径前缀 (e.g., '1', '1.1')。
 
         Returns:
             当前层级及其子层级的 Markdown 结构字符串。
         """
         markdown_str = ""
         indent = "  " * indent_level # 两个空格的缩进
+
         for category in categories:
             key = category.get('category_key', '?')
             desc = category.get('category_desc', 'N/A')
-            markdown_str += f"{indent}- {key}: {desc}\n"
+
+            # Construct the full path for the current category
+            if path_prefix:
+                current_path = f"{path_prefix}.{key}"
+            else:
+                current_path = str(key) # Top level
+
+            # Format according to test_faq_categories.md: INDENTPATH. DESC
+            markdown_str += f"{indent}{current_path}. {desc}\n"
 
             # Check if sub_category exists and is a non-empty list before recursing
             sub_categories = category.get("sub_category")
@@ -90,10 +101,11 @@ class FAQDataParser:
             # max_depth == -1 means no limit
             # indent_level + 1 < max_depth means the next level is within the limit
             if isinstance(sub_categories, list) and sub_categories and (max_depth == -1 or indent_level + 1 < max_depth):
-                markdown_str += self._generate_markdown_recursive(sub_categories, indent_level + 1, max_depth)
+                # Pass the current_path as the new prefix for subcategories
+                markdown_str += self._generate_markdown_recursive(sub_categories, indent_level + 1, max_depth, current_path)
             elif isinstance(sub_categories, list) and sub_categories and max_depth != -1 and indent_level + 1 >= max_depth:
                  # Log a debug message if recursion is stopped due to max_depth
-                 logger.debug(f"Stopped recursion at indent_level {indent_level} for category key {key} due to max_depth limit {max_depth}.")
+                 logger.debug(f"Stopped recursion at indent_level {indent_level} for category path {current_path} due to max_depth limit {max_depth}.")
 
         return markdown_str
 
@@ -109,8 +121,6 @@ class FAQDataParser:
             - description_path: 'desc1 >>> desc2' 格式的路径字符串，如果路径无效则为 None。
         """
         logger.debug(f"Attempting to find answer and path for key path: {key_path}")
-        # desc_trail: List[str] = [] # Removed, trail stored with nodes now
-        # breadcrumb_str: Optional[str] = None # Removed
 
         if not key_path or not isinstance(key_path, str) or len(key_path) == 0:
              logger.warning(f"Invalid key_path received: {key_path}")
@@ -124,48 +134,26 @@ class FAQDataParser:
         current_level_data = self.faq_data
         # Store nodes and trails encountered during descent
         visited_nodes_with_trails: List[Tuple[Dict[str, Any], List[str]]] = []
-        target_node: Optional[Dict[str, Any]] = None # Last successfully matched node before potential .0
+        target_node: Optional[Dict[str, Any]] = None # Last successfully matched node
         current_desc_trail: List[str] = [] # Trail to the current node during iteration
-
 
         try:
             for i, key_str in enumerate(keys):
-                if not key_str.isdigit(): # Ensure key is a digit string
-                    logger.warning(f"Invalid non-digit key '{key_str}' found in path '{key_path}'")
+                if not key_str.isdigit() or key_str == '0': # Ensure key is a non-zero digit string
+                    logger.warning(f"Invalid non-digit or zero key '{key_str}' found in path '{key_path}'")
                     return None, None # Invalid path
                 key = int(key_str) # Convert after check
-
-                # Handle .0 ending: Start upward search from parent
-                if key == 0:
-                    # 到达 .0 结尾，表示父级匹配但子级不匹配
-                    if i == len(keys) - 1:
-                        logger.debug(f"Path '{key_path}' ends with '.0'. Searching ancestors for answer.")
-                        # Start searching upwards from the parent (last visited node)
-                        for node, trail in reversed(visited_nodes_with_trails):
-                            answer = node.get("answer")
-                            if answer is not None:
-                                breadcrumb_str = " >>> ".join(trail) + " >>> N/A"
-                                logger.debug(f"Found answer in ancestor '{breadcrumb_str}' for path '{key_path}'.")
-                                return answer, breadcrumb_str
-                        # No answer found in any ancestor
-                        logger.warning(f"No answer found in ancestor path for key path ending in .0: {key_path}")
-                        # Return None for answer, and None for path as no answer was located.
-                        breadcrumb_str = " >>> ".join(current_desc_trail) + " >>> N/A"
-                        return None, breadcrumb_str
-                    else:
-                        # Intermediate .0 like '1.0.2' is invalid
-                        logger.warning(f"Invalid path '{key_path}' with intermediate '.0'.")
-                        return None, None # Invalid path
 
                 # Normal key processing (non-zero)
                 found_in_level = False
                 for item in current_level_data:
                     item_key = item.get('category_key')
                     if item_key is None:
-                        # logger.debug(f"Skipping item without 'category_key' while processing path '{key_path}'. Item: {item}")
                         continue # Skip items without a key
 
                     try:
+                        # Ensure item_key is treated as string before comparison logic
+                        # but we need the integer value for comparison
                         item_key_int = int(item_key)
                     except (ValueError, TypeError):
                         logger.warning(f"Non-integer category_key '{item_key}' found in data structure while processing path '{key_path}'. Skipping item.")
@@ -184,30 +172,38 @@ class FAQDataParser:
                         elif i < len(keys) - 1: # More keys remaining, but no subcategories found here
                              logger.warning(f"Path '{key_path}' expects subcategories at key '{key}', but none exist or are not a list.")
                              # Path is invalid as it requests deeper level that doesn't exist
-                             breadcrumb_str = " >>> ".join(current_desc_trail) + " >>> N/A"
-                             return None, breadcrumb_str
+                             return None, None # Invalid path, return None for both
 
                         found_in_level = True
                         break # Found the matching item for this level
 
                 if not found_in_level:
                     logger.warning(f"Key '{key}' not found at level {i} for path '{key_path}'.")
-                    breadcrumb_str = " >>> ".join(current_desc_trail) + " >>> N/A"
-                    return None, breadcrumb_str
+                    return None, None # Key not found at this level, invalid path
 
-            # Successfully traversed the *entire non-.0* path
-            # target_node holds the final node, current_desc_trail holds its path
+            # Successfully traversed the path specified by key_path
             final_breadcrumb_str = " >>> ".join(current_desc_trail) if current_desc_trail else None
+
+            # 1. Check if the target node itself has an answer
             if target_node and "answer" in target_node:
                  answer = target_node["answer"]
                  logger.debug(f"Found direct answer for key path '{key_path}'. Trail: '{final_breadcrumb_str}'")
                  return answer, final_breadcrumb_str
-            else:
-                 # Reached a node without an answer (and path didn't end in .0)
-                 logger.warning(f"Path '{key_path}' leads to a node without an 'answer' field. Trail: '{final_breadcrumb_str}'. Node: {target_node}")
-                 # Return None for answer, but the path to the node is still valid
-                 return None, final_breadcrumb_str
+
+            # 2. If target node has no answer, search ancestors
+            logger.debug(f"No direct answer found for '{key_path}'. Searching ancestors.")
+            for node, trail in reversed(visited_nodes_with_trails):
+                answer = node.get("answer")
+                if answer is not None:
+                    breadcrumb_str = " >>> ".join(trail)
+                    logger.debug(f"Found answer in ancestor '{breadcrumb_str}' for path '{key_path}'.")
+                    return answer, breadcrumb_str
+
+            # 3. If no answer found in target or ancestors
+            logger.warning(f"No answer found for path '{key_path}' or its ancestors.")
+            # Return None for answer, and the original path attempted
+            return None, final_breadcrumb_str # Return path even if no answer
 
         except Exception as e: # Catch unexpected errors during traversal
             logger.exception(f"An unexpected error occurred while processing path '{key_path}': {e}")
-            return None, None
+            return None, None # Return None for both on error

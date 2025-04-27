@@ -292,6 +292,7 @@ function App() {
             平台:
             <select value={platformName} onChange={(e) => setPlatformName(e.target.value)} disabled={isLoading}>
               <option value="android">Android</option>
+              <option value="鸿蒙">HarmonyOS</option>
               <option value="ios">iOS</option>
               <option value="web">Web</option>
               <option value="pc">PC</option>
