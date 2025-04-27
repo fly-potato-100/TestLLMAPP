@@ -38,7 +38,7 @@ async def chat_proxy(chat_request: ChatRequest):
 
         elif service_to_call == "agent":
             logging.info("Routing request to FAQ filter agent.")
-            faq_filter_agent = FAQFilterAgent()
+            faq_filter_agent = FAQFilterAgent(chat_request.context_params)
             return await faq_filter_agent.process_user_request(chat_request) # 调用 Custom Agent 服务
 
         else:

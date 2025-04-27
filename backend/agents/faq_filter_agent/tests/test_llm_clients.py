@@ -160,7 +160,7 @@ async def main_test():
             logging.info("--- Testing QueryRewriteClient ---")
             client = QueryRewriteClient(API_KEY, API_BASE, REWRITE_MODEL_ID, rewrite_prompt_template)
             # result = await client.rewrite_query(conversation, context, timeout=args.timeout)
-            result = await client.rewrite_query(input_data, timeout=args.timeout)
+            result, _ = await client.rewrite_query(input_data, timeout=args.timeout)
             print("\n--- Test Result ---")
             print(json.dumps(result, indent=2, ensure_ascii=False))
 
@@ -186,7 +186,7 @@ async def main_test():
             # Run test
             logging.info("--- Testing FAQClassifierClient ---")
             client = FAQClassifierClient(API_KEY, API_BASE, CLASSIFY_MODEL_ID, classify_prompt_template)
-            result = await client.classify_query(query, faq_structure, timeout=args.timeout)
+            result, _ = await client.classify_query(query, faq_structure, timeout=args.timeout)
             print("\n--- Test Result ---")
             print(json.dumps(result, indent=2, ensure_ascii=False))
 

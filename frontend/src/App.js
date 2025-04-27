@@ -85,7 +85,7 @@ function App() {
   const [input, setInput] = useState('');
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [channelName, setChannelName] = useState('官方');
+  const [channelName, setChannelName] = useState('祖龙');
   const [platformName, setPlatformName] = useState('android');
   const [serviceName, setServiceName] = useState('agent');
   const messagesEndRef = useRef(null);
@@ -247,7 +247,17 @@ function App() {
                 <>
                   <div className="avatar user-avatar">🧑</div>
                   <div className="message-content-wrapper user">
-                    <div className={`message ${msg.sender}`}>{msg.text}</div>
+                    <div
+                      className={`message ${msg.sender}`}
+                      onClick={() => {
+                        if (!isLoading) {
+                          setInput(msg.text);
+                        }
+                      }}
+                      style={{ cursor: !isLoading ? 'pointer' : 'default' }}
+                    >
+                      {msg.text}
+                    </div>
                     <div className="message-footer user">
                         <div className="timestamp">{msg.time}</div>
                     </div>
@@ -272,11 +282,10 @@ function App() {
           <label>
             渠道:
             <select value={channelName} onChange={(e) => setChannelName(e.target.value)} disabled={isLoading}>
+              <option value="祖龙">祖龙</option>
               <option value="小米">小米</option>
               <option value="华为">华为</option>
               <option value="苹果">苹果</option>
-              <option value="官方">官方</option>
-              <option value="祖龙">祖龙</option>
             </select>
           </label>
           <label>

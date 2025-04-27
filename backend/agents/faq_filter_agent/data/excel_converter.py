@@ -14,25 +14,29 @@ class ExcelConverter:
             excel_file_path: Excel 文件的路径。
         """
         self.excel_file_path = excel_file_path
-        self.data = None
-        self.processed_data = [] # 初始化为空列表
 
-    def read_excel(self, sheet_name=0):
+    def read_excel(self, sheet_name: str, base_sheet_name: str = None) -> list:
         """
         读取 Excel 文件。
 
         Args:
-            sheet_name: 要读取的工作表名称或索引，默认为第一个工作表。
+            sheet_name: 要读取的工作表名称。
+            base_sheet_name: 基础工作表名称，默认为 None。如果指定了基础工作表名称，会先加载基础工作表，然后把sheet_name中的数据合并到基础工作表中。
         """
         try:
-            self.data = pd.read_excel(self.excel_file_path, sheet_name=sheet_name)
+            sheet_data = pd.read_excel(self.excel_file_path, sheet_name=sheet_name)
+            if base_sheet_name is not None:
+                base_sheet_data = pd.read_excel(self.excel_file_path, sheet_name=base_sheet_name)
+                sheet_data = pd.concat([base_sheet_data, sheet_data], ignore_index=True)
             print(f"成功读取 Excel 文件: {self.excel_file_path}")
         except FileNotFoundError:
             print(f"错误: 文件未找到 {self.excel_file_path}")
-            self.data = None
+            return
         except Exception as e:
             print(f"读取 Excel 文件时出错: {e}")
-            self.data = None
+            return
+
+        return self._process_rows(sheet_data)
 
     def _process_row(self, row):
         """
@@ -56,20 +60,17 @@ class ExcelConverter:
         #print(row_values[:-1])
         return row_values
 
-    def process_rows(self):
+    def _process_rows(self, sheet_data):
         """
         遍历并处理 Excel 文件中的所有行。
         """
-        if self.data is None:
+        if sheet_data is None:
             print("错误: 数据未加载，请先调用 read_excel()")
             return
 
-        # 直接在遍历时构建 self.processed_data
-        for index, row in self.data.iterrows():
-            # 跳过表头 (假设第一行是表头)
-            #if index == 0: 
-            #    continue
-
+        # 直接在遍历时构建 processed_data
+        processed_data = []
+        for index, row in sheet_data.iterrows():
             processed_row_data = self._process_row(row)
             if processed_row_data:
                 # ---- 将合并逻辑移到此处 ----
@@ -80,7 +81,7 @@ class ExcelConverter:
                 keys = processed_row_data[:-1]
                 value = processed_row_data[-1]
 
-                current_level = self.processed_data # 从根列表开始
+                current_level = processed_data # 从根列表开始
                 for i, key in enumerate(keys):
                     found_node = None
                     # 在当前层级查找具有相同 category_desc 的节点
@@ -96,13 +97,16 @@ class ExcelConverter:
                         if is_last_key:
                             # 如果是最后一个 key，设置 answer
                             found_node["answer"] = value
-                            # 如果之前有 sub_category，移除它，因为现在是叶子节点
-                            found_node.pop("sub_category", None)
+                            # 不再移除 sub_category
+                            # found_node.pop("sub_category", None)
                         else:
                             # 如果不是最后一个 key，确保有 sub_category 并进入下一层
                             if "sub_category" not in found_node:
-                                # 如果节点之前是叶子节点 (有 answer)，移除 answer
-                                found_node.pop("answer", None)
+                                # 节点可以同时有 answer 和 sub_category，不再移除 answer
+                                # found_node.pop("answer", None)
+                                found_node["sub_category"] = []
+                            # 检查 current_level 是否为 None 或不是列表，如果需要则创建
+                            if not isinstance(found_node.get("sub_category"), list):
                                 found_node["sub_category"] = []
                             current_level = found_node["sub_category"]
                     else:
@@ -123,16 +127,17 @@ class ExcelConverter:
                 # ---- 合并逻辑结束 ----
 
         print("数据结构构建完成。")
+        return processed_data
 
-    def dump_processed_data(self, output_file_path: str):
+    def dump_processed_data(self, processed_data, output_file_path: str):
         if output_file_path is not None and len(output_file_path) > 0:
             # 写入文件
             with open(output_file_path, "w", encoding="utf-8") as f:
-                json.dump(self.processed_data, f, indent=4, ensure_ascii=False)
+                json.dump(processed_data, f, indent=4, ensure_ascii=False)
             print(f"数据已保存到 {output_file_path}")
         else:
             # 打印到控制台
-            print(json.dumps(self.processed_data, indent=4, ensure_ascii=False))
+            print(json.dumps(processed_data, indent=4, ensure_ascii=False))
 
 # 示例用法
 if __name__ == "__main__":
@@ -140,6 +145,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='将 Excel 文件转换为 JSON 格式。')
     parser.add_argument('excel_file', type=str, help='要转换的 Excel 文件路径')
     parser.add_argument('--sheet', default=0, help='要读取的工作表名称或索引 (默认为 0)')
+    parser.add_argument('--base_sheet', default=None, help='基础工作表名称 (默认为 None)')
     parser.add_argument('--output', default=None, help='输出文件路径 (默认为 None)')
 
     # 解析命令行参数
@@ -147,7 +153,5 @@ if __name__ == "__main__":
 
     # 使用从命令行获取的文件路径创建转换器实例
     converter = ExcelConverter(args.excel_file)
-    converter.read_excel(sheet_name=args.sheet)
-    if converter.data is not None:
-        converter.process_rows()
-        converter.dump_processed_data(args.output)
+    processed_data = converter.read_excel(sheet_name=args.sheet, base_sheet_name=args.base_sheet)
+    converter.dump_processed_data(processed_data, args.output)

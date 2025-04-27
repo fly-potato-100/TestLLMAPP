@@ -23,7 +23,7 @@ AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 class FAQFilterAgent:
     """AI Agent 的主入口和协调器。"""
 
-    def __init__(self):
+    def __init__(self, context_params: Dict[str, Any] = None):
         """初始化 Agent，从 config.py 加载配置并创建依赖项。"""
         logger.info("Initializing FAQFilterAgent...")
 
@@ -34,6 +34,15 @@ class FAQFilterAgent:
 
             # Resolve absolute paths for files based on AGENT_DIR
             faq_file_path = os.path.join(AGENT_DIR, cfg['faq_file_path'])
+            if context_params is not None and context_params.get('channel_name') is not None:
+                channel_name = context_params['channel_name']
+                # 同目录下查看是否存在指定channel的faq文件
+                channel_specific_faq_file_path = faq_file_path.replace('.json', f'-{channel_name}.json')
+                if os.path.exists(channel_specific_faq_file_path):
+                    faq_file_path = channel_specific_faq_file_path
+                else:
+                    logger.debug(f"Channel-specific FAQ file not found: {channel_specific_faq_file_path}")
+                    logger.debug(f"Using default FAQ file: {faq_file_path}")
             rewrite_prompt_path = os.path.join(AGENT_DIR, cfg['rewrite_prompt_path'])
             classify_prompt_path = os.path.join(AGENT_DIR, cfg['classify_prompt_path'])
 

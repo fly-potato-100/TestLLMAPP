@@ -31,6 +31,12 @@ parser.add_argument(
     help="Function to test: 'markdown' (get category structure) or 'answer' (get answer by key path)."
 )
 parser.add_argument(
+    "--max-depth",
+    type=int,
+    default=-1,
+    help="Maximum depth for category structure (default: -1 for unlimited)."
+)
+parser.add_argument(
     "--key-path",
     type=str,
     help="The key path (e.g., '1.1.2') to search for when --test-func is 'answer'."
@@ -64,7 +70,7 @@ try:
     # Execute the requested function
     if args.test_func == 'markdown':
         print("\n--- Testing get_category_structure_markdown ---")
-        markdown_structure = parser_instance.get_category_structure_markdown()
+        markdown_structure = parser_instance.get_category_structure_markdown(args.max_depth)
         print("\nGenerated Markdown Structure:")
         print(markdown_structure) # Print raw string
 
