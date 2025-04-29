@@ -4,7 +4,7 @@
 
 本模块实现了一个 AI Agent，旨在根据玩家与客服的对话历史和提供的 FAQ 文档，自动筛选并返回最相关的 FAQ 答案。其核心功能是理解玩家意图，利用大型语言模型（LLM）进行问题分类，并从结构化的 FAQ 数据中检索答案。
 
-该模块设计为可被上层服务（如 `backend/server.py`）集成使用，同时也支持独立的测试和开发。
+该模块设计为可被上层服务（如 `backend/app.py`）集成使用，同时也支持独立的测试和开发。
 
 ## 核心工作流
 
@@ -38,8 +38,8 @@
 
 ## 使用
 
-上层服务（如 `backend`）可以通过导入 `FAQFilterAgent` 类并调用其处理方法（例如 `process_user_request(conversation, context)`）来使用此模块。
+上层服务（如 `backend`）可以通过导入 `FAQFilterAgent` 类并调用其处理方法（例如 `process_user_request`）来使用此模块。
 
 ## 测试
 
-建议在 `backend/tests/faq_filter_agent/` 目录下为各组件编写单元测试，利用 Mock 对象模拟 LLM API 调用和文件读取，以实现独立的模块测试。 
+建议在 `backend/agents/faq_filter_agent/tests` 目录下为各组件编写单元测试，模拟 LLM API 调用和文件读取，以实现独立的模块测试。 

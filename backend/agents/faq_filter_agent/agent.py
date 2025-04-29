@@ -23,7 +23,7 @@ AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 class FAQFilterAgent:
     """AI Agent 的主入口和协调器。"""
 
-    def __init__(self, context_params: Dict[str, Any] = None):
+    def __init__(self, context_params: Dict[str, Any] = None, model_name: str = None):
         """初始化 Agent，从 config.py 加载配置并创建依赖项。"""
         logger.info("Initializing FAQFilterAgent...")
 
@@ -65,13 +65,13 @@ class FAQFilterAgent:
             self.rewrite_client = QueryRewriteClient(
                 api_key=cfg['rewrite_api_key'],
                 api_base=cfg['rewrite_api_base'],
-                model_name=cfg['rewrite_model'],
+                model_name=model_name or cfg['rewrite_model'],
                 prompt_template=rewrite_prompt
             )
             self.classifier_client = FAQClassifierClient(
                 api_key=cfg['classify_api_key'],
                 api_base=cfg['classify_api_base'],
-                model_name=cfg['classify_model'],
+                model_name=model_name or cfg['classify_model'],
                 prompt_template=classify_prompt
             )
             logger.info("FAQFilterAgent initialized successfully.")
@@ -208,7 +208,7 @@ class FAQFilterAgent:
                 candidates.append(ChatCandidate(
                     content=final_answer, 
                     score=1.0, 
-                    reason=f"分类路径：{result['category_key_path']}（{result['breadcrumb_str']}）\n分类依据：{result['reason']}"
+                    reason=f"分类路径：{result['category_key_path']}；采纳路径：“{result['breadcrumb_str']}”\n分类依据：{result['reason']}"
                 ))
             else:
                 # 未找到具体答案

@@ -36,9 +36,16 @@ async def chat_proxy(chat_request: ChatRequest):
                 raise HTTPException(status_code=500, detail="Coze service configuration is missing.")
             return await call_coze_api(chat_request) # 调用 Coze 服务
 
-        elif service_to_call == "agent":
+        elif service_to_call.startswith("agent:"):
             logging.info("Routing request to FAQ filter agent.")
-            faq_filter_agent = FAQFilterAgent(chat_request.context_params)
+            model_type = service_to_call.split(":")[1]
+            if model_type == "pro":
+                model_name = "doubao-1-5-pro-32k-250115"
+            elif model_type == "lite":
+                model_name = "doubao-1-5-lite-32k-250115"
+            else:
+                raise HTTPException(status_code=400, detail=f"Invalid model type: {model_type}")
+            faq_filter_agent = FAQFilterAgent(chat_request.context_params, model_name=model_name)
             return await faq_filter_agent.process_user_request(chat_request) # 调用 Custom Agent 服务
 
         else:
