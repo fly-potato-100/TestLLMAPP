@@ -9,7 +9,9 @@ from typing import Union, List, Dict, Optional
 from dotenv import load_dotenv
 
 # Use absolute imports assuming the script is run with -m from the project root
-from backend.agents.faq_filter_agent.llm_clients import VolcanoLLMClient, QueryRewriteClient, FAQClassifierClient, DEFAULT_TIMEOUT
+from backend.agents.faq_filter_agent.llm_clients import QueryRewriteClient, FAQClassifierClient, DEFAULT_TIMEOUT
+from backend.agents.faq_filter_agent.llm_impl.volcano_llm_impl import VolcanoLLMImpl
+from backend.agents.faq_filter_agent.llm_impl.bailian_llm_impl import BailianLLMImpl
 from backend.agents.faq_filter_agent.exceptions import LLMAPIError, LLMResponseError
 
 # Configure logging ONLY when run as a script
@@ -36,6 +38,7 @@ parser.add_argument("--input-file", help="Path to JSON file containing input dat
 parser.add_argument("--query", help="The query text to classify. Required if client_type is 'classify'.")
 parser.add_argument("--faq-structure-file", help="Path to text file containing the markdown FAQ structure. Required if client_type is 'classify'.")
 # Common arguments
+parser.add_argument("--model-platform", default='volcano', choices=['volcano', 'bailian'], help="The platform of the model to use. Required for all modes.")
 parser.add_argument("--rewrite-prompt", default=os.path.join(default_prompts_dir, 'rewrite_prompt.md'), help="Path to the query rewrite prompt template file.")
 parser.add_argument("--classify-prompt", default=os.path.join(default_prompts_dir, 'classify_prompt.md'), help="Path to the FAQ classification prompt template file.")
 parser.add_argument("--env-file", default=default_env_path, help=f"Path to the .env file (default: {default_env_path}).")
@@ -58,35 +61,6 @@ if not os.path.exists(args.env_file):
     sys.exit(1)
 load_dotenv(dotenv_path=args.env_file)
 logging.info(f"Loaded environment variables from: {args.env_file}")
-
-# Load common configurations from environment
-API_KEY = os.getenv("VOLCANO_API_KEY")
-API_BASE = os.getenv("VOLCANO_API_BASE", "https://ark.cn-beijing.volces.com/api/v3")
-# Use VOLCANO_MODEL for all modes now
-VOLCANO_MODEL = os.getenv("VOLCANO_MODEL")
-REWRITE_MODEL_ID = VOLCANO_MODEL
-CLASSIFY_MODEL_ID = VOLCANO_MODEL
-TALK_MODEL_ID = VOLCANO_MODEL
-
-# Check essential configuration
-if not API_KEY or not API_BASE:
-    logging.error("VOLCANO_API_KEY or VOLCANO_API_BASE not found in environment.")
-    print("Error: VOLCANO_API_KEY or VOLCANO_API_BASE missing in .env file or environment.", file=sys.stderr)
-    sys.exit(1)
-# Check model ID based on mode
-model_id_needed = None
-if args.client_type == 'rewrite':
-    model_id_needed = REWRITE_MODEL_ID
-elif args.client_type == 'classify':
-    model_id_needed = CLASSIFY_MODEL_ID
-elif args.client_type == 'talk':
-     model_id_needed = TALK_MODEL_ID
-
-if not model_id_needed:
-     logging.error(f"VOLCANO_MODEL not found in environment, which is required for mode '{args.client_type}'.")
-     print(f"Error: VOLCANO_MODEL missing in .env file or environment for mode '{args.client_type}'.", file=sys.stderr)
-     sys.exit(1)
-
 
 # Load prompt templates only if needed
 rewrite_prompt_template = ""
@@ -137,6 +111,24 @@ def load_file_content(file_path: Optional[str], is_json: bool = False) -> Union[
 async def main_test():
     result = None
     try:
+
+        if args.model_platform == 'volcano':
+            # Load common configurations from environment
+            API_KEY = os.getenv("VOLCANO_API_KEY")
+            API_BASE = os.getenv("VOLCANO_API_BASE")
+            # Use VOLCANO_MODEL for all modes now
+            VOLCANO_MODEL = os.getenv("VOLCANO_MODEL")
+            llm_impl = VolcanoLLMImpl(API_KEY, API_BASE, VOLCANO_MODEL)
+        elif args.model_platform == 'bailian':
+            # Load common configurations from environment
+            API_KEY = os.getenv("BAILIAN_API_KEY")
+            API_BASE = os.getenv("BAILIAN_API_BASE")
+            # Use BAILIAN_MODEL for all modes now
+            BAILIAN_MODEL = os.getenv("BAILIAN_MODEL")
+            llm_impl = BailianLLMImpl(API_KEY, API_BASE, BAILIAN_MODEL)
+        else:
+            raise ValueError(f"Invalid model platform: {args.model_platform}")
+        
         if args.client_type == 'rewrite':
             # Validate args
             # if not args.conversation_file or not args.context_file:
@@ -158,7 +150,7 @@ async def main_test():
 
             # Run test
             logging.info("--- Testing QueryRewriteClient ---")
-            client = QueryRewriteClient(API_KEY, API_BASE, REWRITE_MODEL_ID, rewrite_prompt_template)
+            client = QueryRewriteClient(llm_impl, rewrite_prompt_template)
             # result = await client.rewrite_query(conversation, context, timeout=args.timeout)
             result, _ = await client.rewrite_query(input_data, timeout=args.timeout)
             print("\n--- Test Result ---")
@@ -185,19 +177,20 @@ async def main_test():
 
             # Run test
             logging.info("--- Testing FAQClassifierClient ---")
-            client = FAQClassifierClient(API_KEY, API_BASE, CLASSIFY_MODEL_ID, classify_prompt_template)
+            client = FAQClassifierClient(llm_impl, classify_prompt_template)
             result, _ = await client.classify_query(query, faq_structure, timeout=args.timeout)
             print("\n--- Test Result ---")
             print(json.dumps(result, indent=2, ensure_ascii=False))
 
         elif args.client_type == 'talk':
-            logging.info(f"--- Starting Talk Mode with model {TALK_MODEL_ID} --- ")
-            print(f"Using model: {TALK_MODEL_ID}")
+            logging.info(f"--- Starting Talk Mode with model {args.model_platform} --- ")
+            print(f"Using model: {args.model_platform}")
             print("Enter your message, or type 'quit' or 'exit' to end.")
-            client = VolcanoLLMClient(API_KEY, API_BASE, TALK_MODEL_ID)
             # Simple conversation history for talk mode (optional, could be expanded)
             # history = [] 
             # history.append({"role": "system", "content": args.system_prompt})
+
+            #system_prompt = load_file_content(args.system_prompt)
 
             while True:
                 try:
@@ -217,7 +210,7 @@ async def main_test():
                 # For a more stateful chat, you would append user_input to history
                 # and send the relevant part of history.
                 messages = [
-                    # {"role": "system", "content": args.system_prompt}, # Optional system prompt
+                    #{"role": "system", "content": system_prompt}, # Optional system prompt
                     {"role": "user", "content": user_input}
                 ]
                 # messages = history + [{"role": "user", "content": user_input}]
@@ -225,14 +218,18 @@ async def main_test():
                 print("...calling API...")
                 try:
                     # Call API without requesting JSON format
-                    api_response = await client._call_api(messages=messages, timeout=args.timeout, temperature=0.7)
+                    assistant_message, _, api_response = await llm_impl.chat_completion(
+                        messages=messages,
+                        timeout=args.timeout,
+                        temperature=0.7,
+                        #response_format={"type": "json_object"}
+                    )
                     # Print the raw response JSON
                     print("--- Raw API Response ---")
                     print(json.dumps(api_response, indent=2, ensure_ascii=False))
                     print("------------------------")
                     
                     # Extract and print the assistant's message for convenience
-                    assistant_message = api_response.get('choices', [{}])[0].get('message', {}).get('content')
                     if assistant_message:
                         print(f"Assistant: {assistant_message}")
                         # Add assistant response to history if maintaining state

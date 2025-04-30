@@ -87,7 +87,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [channelName, setChannelName] = useState('祖龙');
   const [platformName, setPlatformName] = useState('android');
-  const [serviceName, setServiceName] = useState('agent:pro');
+  const [serviceName, setServiceName] = useState('agent:volcano');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -315,8 +315,8 @@ function App() {
             <select className="service-select" value={serviceName} onChange={(e) => setServiceName(e.target.value)} disabled={isLoading}>
               <option value="bailian">Bailian</option>
               <option value="coze">Coze</option>
-              <option value="agent:pro">Agent(Pro)</option>
-              <option value="agent:lite">Agent(Lite)</option>
+              <option value="agent:volcano">Agent(火山方舟)</option>
+              <option value="agent:bailian">Agent(阿里百炼)</option>
             </select>
           </div>
           <button className="clear-btn" onClick={handleClear} aria-label="清空" disabled={isLoading}>

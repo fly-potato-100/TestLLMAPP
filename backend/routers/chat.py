@@ -37,15 +37,14 @@ async def chat_proxy(chat_request: ChatRequest):
             return await call_coze_api(chat_request) # 调用 Coze 服务
 
         elif service_to_call.startswith("agent:"):
-            logging.info("Routing request to FAQ filter agent.")
-            model_type = service_to_call.split(":")[1]
-            if model_type == "pro":
-                model_name = "doubao-1-5-pro-32k-250115"
-            elif model_type == "lite":
-                model_name = "doubao-1-5-lite-32k-250115"
+            model_platform = service_to_call.split(":")[1]
+            if model_platform == "volcano":
+                logging.info("Routing request to Volcano agent.")
+            elif model_platform == "bailian":
+                logging.info("Routing request to Bailian agent.")
             else:
-                raise HTTPException(status_code=400, detail=f"Invalid model type: {model_type}")
-            faq_filter_agent = FAQFilterAgent(chat_request.context_params, model_name=model_name)
+                raise HTTPException(status_code=400, detail=f"Invalid model platform: {model_platform}")
+            faq_filter_agent = FAQFilterAgent(chat_request.context_params, model_platform=model_platform)
             return await faq_filter_agent.process_user_request(chat_request) # 调用 Custom Agent 服务
 
         else:

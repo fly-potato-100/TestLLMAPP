@@ -10,20 +10,18 @@ from .llm_clients import QueryRewriteClient, FAQClassifierClient
 from ...models.chat import ChatRequest, ChatResponse, ChatCandidate, ChatModelUsages # Adjusted import path
 from . import config # Import config module
 from .exceptions import ConfigurationError, PromptLoadError # Import custom exceptions
-
+# Import the specific LLM implementation
+from .llm_impl.volcano_llm_impl import VolcanoLLMImpl
+from .llm_impl.bailian_llm_impl import BailianLLMImpl
 # TODO: Consider adding custom exceptions from exceptions.py
 
 # Setup logger for this module
 logger = logging.getLogger(__name__)
 
-# Determine the directory of the current agent.py file
-# This helps resolve relative paths in config.py correctly
-AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 class FAQFilterAgent:
     """AI Agent 的主入口和协调器。"""
 
-    def __init__(self, context_params: Dict[str, Any] = None, model_name: str = None):
+    def __init__(self, context_params: Dict[str, Any] = None, model_platform: str = None):
         """初始化 Agent，从 config.py 加载配置并创建依赖项。"""
         logger.info("Initializing FAQFilterAgent...")
 
@@ -33,7 +31,7 @@ class FAQFilterAgent:
             cfg = config.load_configuration()
 
             # Resolve absolute paths for files based on AGENT_DIR
-            faq_file_path = os.path.join(AGENT_DIR, cfg['faq_file_path'])
+            faq_file_path = cfg.faq_file_path
             if context_params is not None and context_params.get('channel_name') is not None:
                 channel_name = context_params['channel_name']
                 # 同目录下查看是否存在指定channel的faq文件
@@ -43,14 +41,12 @@ class FAQFilterAgent:
                 else:
                     logger.debug(f"Channel-specific FAQ file not found: {channel_specific_faq_file_path}")
                     logger.debug(f"Using default FAQ file: {faq_file_path}")
-            rewrite_prompt_path = os.path.join(AGENT_DIR, cfg['rewrite_prompt_path'])
-            classify_prompt_path = os.path.join(AGENT_DIR, cfg['classify_prompt_path'])
 
             # Load prompts
             try:
-                with open(rewrite_prompt_path, 'r', encoding='utf-8') as f:
+                with open(cfg.rewrite_prompt_path, 'r', encoding='utf-8') as f:
                     rewrite_prompt = f.read()
-                with open(classify_prompt_path, 'r', encoding='utf-8') as f:
+                with open(cfg.classify_prompt_path, 'r', encoding='utf-8') as f:
                     classify_prompt = f.read()
                 logger.debug("Successfully loaded prompt files.")
             except FileNotFoundError as e:
@@ -60,18 +56,24 @@ class FAQFilterAgent:
                  logger.error(f"Error reading prompt file: {e}")
                  raise PromptLoadError(f"Could not read prompt file: {e}") from e
 
+            # Initialize LLM Implementation based on config
+            api_key, api_base, model_id = cfg.get_model_config(model_platform)
+            if model_platform == "volcano":
+                llm_impl = VolcanoLLMImpl(api_key, api_base, model_id)
+            elif model_platform == "bailian":
+                llm_impl = BailianLLMImpl(api_key, api_base, model_id)
+            else:
+                raise ValueError(f"Invalid model platform: {model_platform}")
+                
+
             # Initialize components
             self.faq_parser = FAQDataParser(faq_file_path=faq_file_path)
             self.rewrite_client = QueryRewriteClient(
-                api_key=cfg['rewrite_api_key'],
-                api_base=cfg['rewrite_api_base'],
-                model_name=model_name or cfg['rewrite_model'],
+                llm_client=llm_impl, # Pass the LLM instance
                 prompt_template=rewrite_prompt
             )
             self.classifier_client = FAQClassifierClient(
-                api_key=cfg['classify_api_key'],
-                api_base=cfg['classify_api_base'],
-                model_name=model_name or cfg['classify_model'],
+                llm_client=llm_impl, # Pass the LLM instance
                 prompt_template=classify_prompt
             )
             logger.info("FAQFilterAgent initialized successfully.")
@@ -206,9 +208,9 @@ class FAQFilterAgent:
                 logger.info(f"Retrieved Answer by path: {result['breadcrumb_str']}, answer_size: { 'N/A' if result['final_answer'] is None else len(result['final_answer'])}") # Log snippet
                 final_answer = result['final_answer'] or fallback_answer
                 candidates.append(ChatCandidate(
-                    content=final_answer, 
-                    score=1.0, 
-                    reason=f"分类路径：{result['category_key_path']}；采纳路径：“{result['breadcrumb_str']}”\n分类依据：{result['reason']}"
+                    content=final_answer,
+                    score=1.0,
+                    reason=f"分类路径：{result['category_key_path']}；采纳路径：\"{result['breadcrumb_str']}\"\n分类依据：{result['reason']}"
                 ))
             else:
                 # 未找到具体答案
