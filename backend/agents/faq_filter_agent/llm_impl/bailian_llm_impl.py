@@ -1,6 +1,7 @@
 import httpx
 import json
 import logging
+import os
 from typing import List, Dict, Any, Tuple, Optional, AsyncGenerator
 
 from backend.models.chat import ChatModelUsage
@@ -39,6 +40,7 @@ class BailianLLMImpl(BaseLLMImpl):
         self,
         messages: List[Dict[str, str]],
         is_stream: bool,
+        enable_thinking: bool = False,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -49,6 +51,7 @@ class BailianLLMImpl(BaseLLMImpl):
             "model": self.model_id,
             "messages": messages,
             "stream": is_stream,
+            "enable_thinking": enable_thinking,
         }
 
         # Add optional parameters if provided
@@ -65,8 +68,6 @@ class BailianLLMImpl(BaseLLMImpl):
 
         if is_stream:
             request_body["stream_options"] = {"include_usage": True}
-            # 流式模式下，不能设置 response_format 为 json_object
-            request_body["response_format"] = None
 
         logger.debug(f"Built Bailian Request Body (stream={is_stream}): {json.dumps(request_body, ensure_ascii=False, indent=2)}")
         return request_body
@@ -87,12 +88,20 @@ class BailianLLMImpl(BaseLLMImpl):
         对于流式调用 ('qwen3' 前缀)，会聚合响应内容并返回与非流式兼容的格式。
         """
         model_prefix = self.model_id.split('-', 1)[0]
-        is_stream = model_prefix == 'qwen3'
+        is_stream = False
+        enable_thinking = os.getenv('QWEN3_ENABLE_THINKING', 'false').lower() == 'true'
+        if model_prefix == 'qwen3':
+            # qwen3必须启用流式
+            is_stream = True
+            if enable_thinking:
+                # 启用了思考，不能设置 response_format 为 json_object，否则会报错
+                response_format = None
 
         # Build request body first
         request_body = self._build_request_body(
             messages=messages,
             is_stream=is_stream,
+            enable_thinking=enable_thinking,
             temperature=temperature,
             top_p=top_p,
             max_tokens=max_tokens,

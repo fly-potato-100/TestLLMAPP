@@ -308,6 +308,12 @@
   display: inline-block;
 }
 
+/* 新增：耗时信息样式 */
+.loading-duration-display {
+  margin-left: 8px; /* 和时间戳分开一点 */
+  color: #999; /* 比时间戳颜色稍浅 */
+}
+
 .message.ai .message-footer {
   color: #777;
 }
@@ -386,6 +392,8 @@
 /* Loading dots animation */
 .loading-dots span {
   animation: blink 1.4s infinite both;
+  font-weight: bold;
+  font-size: 1.2em; /* 让点更明显一点 */
 }
 
 .loading-dots span:nth-child(2) {
@@ -528,4 +536,23 @@
   color: #555; /* 原因文字颜色稍深 */
   font-size: 0.9em;
   white-space: pre-wrap; /* 新增：保留换行符和空格 */
+}
+
+/* 修改加载指示器的样式 */
+.message.loading-indicator {
+  background-color: #e9e9eb;
+  color: #333;
+  align-self: flex-start;
+  /* margin-left: 10px; */ /* 移除，让wrapper控制 */
+  padding: 10px 15px;
+  border-radius: 18px;
+  display: flex; /* 改为 flex 布局 */
+  align-items: baseline; /* 基线对齐 */
+}
+
+/* 新增：计时器样式 */
+.loading-timer {
+  margin-left: 8px; /* 与点分开一点 */
+  font-size: 0.9em; /* 比消息文本小一点 */
+  color: #666; /* 灰色 */
 }

@@ -89,6 +89,10 @@ function App() {
   const [platformName, setPlatformName] = useState('android');
   const [serviceName, setServiceName] = useState('agent:volcano');
   const messagesEndRef = useRef(null);
+  // 新增状态
+  const [loadingStartTime, setLoadingStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const intervalRef = useRef(null); // 用于存储 interval ID
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -97,6 +101,28 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // 新增 useEffect 处理计时器
+  useEffect(() => {
+    if (isLoading && loadingStartTime) {
+      intervalRef.current = setInterval(() => {
+        const seconds = (Date.now() - loadingStartTime) / 1000;
+        setElapsedTime(seconds);
+      }, 100); // 每 100ms 更新一次，实现 0.1 秒精度
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+    // 清理函数：组件卸载或 isLoading 变化时清除 interval
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isLoading, loadingStartTime]);
 
   // 处理切换候选答案
   const handleSelectCandidate = (msgIndex, newIndex) => {
@@ -117,11 +143,20 @@ function App() {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
-    const userMessage = { text: input, sender: 'user', time: new Date().toLocaleTimeString() };
+    // --- 记录开始时间 (局部变量) ---
+    const requestStartTime = Date.now(); 
+    // ------------------------------
+
+    const userMessage = { text: input, sender: 'user', time: new Date(requestStartTime).toLocaleTimeString() };
     const currentInput = input;
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+
     setIsLoading(true);
+    // --- 更新状态用于驱动实时计时器 ---
+    setLoadingStartTime(requestStartTime); // 使用同一个时间戳更新状态
+    setElapsedTime(0);
+    // --------------------------------
 
     try {
       // 准备符合 API 格式的消息历史
@@ -137,27 +172,29 @@ function App() {
 
       // 发送到后端代理
       const url = `${CONFIG.API_BASE_URL}/chat`;
-      // 修改 requestData 结构，添加 service_name
       const requestData = {
-        conversation: historyMessages, // 使用格式化后的历史消息和当前输入
-        session_id: currentSessionId, // 发送当前 sessionId
-        service: serviceName, // 将 service 移到顶层
+        conversation: historyMessages,
+        session_id: currentSessionId,
+        service: serviceName,
         context_params: {
           channel_name: channelName,
           platform_name: platformName,
-          // service: serviceName, // 从这里移除
         }
       };
       console.log('Sending request to:', url);
       console.log('Request data:', requestData);
-      // 发送当前 session_id 到后端
       const response = await axios.post(url, requestData);
       console.log('Received response:', response.data);
+
+      const requestEndTime = Date.now();
 
       // --- 处理 AI 回复 (统一按 JSON 候选答案格式处理) --- 
       let aiResponseText = '抱歉，未能获取到回复。';
       let candidates = [];
       let selectedIndex = 0;
+      // --- 使用局部变量计算精确耗时 --- 
+      const durationSeconds = requestStartTime ? (requestEndTime - requestStartTime) / 1000 : 0;
+      // --------------------------------
 
       const rawResponse = response.data.response_text;
 
@@ -165,7 +202,7 @@ function App() {
         // 始终尝试将 response_text 解析为 JSON 数组 (候选答案列表)
         candidates = JSON.parse(rawResponse);
         // 如果解析成功且是包含内容的数组，取第一个作为默认回复
-        aiResponseText = candidates[0].content; // 添加空检查
+        aiResponseText = candidates[0].content;
         selectedIndex = 0;
 
       } catch (e) {
@@ -175,25 +212,23 @@ function App() {
 
       const aiMessage = {
         text: aiResponseText,
-        candidateAnswers: candidates, // 传递解析后的候选答案列表
+        candidateAnswers: candidates,
         selectedIndex: selectedIndex,
         sender: 'ai',
-        time: new Date().toLocaleTimeString(),
+        time: new Date(requestEndTime).toLocaleTimeString(),
         sessionId: response.data.session_id,
-        usages: response.data.usages
+        usages: response.data.usages,
+        loadingDuration: durationSeconds.toFixed(1) // 使用精确计算的耗时
       };
       // --- 处理结束 ---
 
       console.log('AI message:', aiMessage);
 
       setMessages(prev => [...prev, aiMessage]);
-      // 更新当前 session_id 以备下次请求使用
       setCurrentSessionId(response.data.session_id);
 
     } catch (error) {
       console.error('Error sending message:', error);
-      
-      // 使用函数式更新
       const errorMessage = { 
           text: `${error.response?.data?.error || error.message || '未知错误'}`, 
           sender: 'error', 
@@ -202,6 +237,7 @@ function App() {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setLoadingStartTime(null); // 清空状态，停止实时计时器
     }
   };
 
@@ -231,6 +267,11 @@ function App() {
                     <div className="message-footer">
                       <SessionInfo sessionId={msg.sessionId} usages={msg.usages} />
                       <div className="timestamp">{msg.time}</div>
+                      {msg.loadingDuration && (
+                        <span className="loading-duration-display">
+                          (耗时: {msg.loadingDuration}s)
+                        </span>
+                      )}
                     </div>
                   </div>
                 </>
@@ -270,8 +311,15 @@ function App() {
             <div className="message-row ai">
               <div className="avatar ai-avatar">⏳</div>
               <div className="message-content-wrapper">
-                <div className="message ai loading-dots">
-                  <span>.</span><span>.</span><span>.</span>
+                <div className="message ai loading-indicator">
+                  <span className="loading-dots">
+                    <span>.</span><span>.</span><span>.</span>
+                  </span>
+                  {loadingStartTime && (
+                    <span className="loading-timer">
+                       ({elapsedTime.toFixed(1)}s)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
